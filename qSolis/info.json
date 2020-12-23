@@ -1,0 +1,25 @@
+{
+  "type": "Standard",
+  "core" : true,
+  "name": "SOLIS",
+  "icon": ":/CC/plugin/qSOLIS/images/SOLISIcon.png",
+  "description": "Solar Radiation for mesh or point clouds",
+  "authors": [
+    {
+      "name": "David Basler",
+      "email": "david.j.basler@gmail.com"
+    }
+  ],
+  "maintainers": [
+    {
+      "name": "David Basler",
+      "email": "david.j.basler@gmail.com"
+    }
+  ],
+  "references": [
+    {
+      "text": "Documentation",
+      "url": "http://www.cloudcompare.org/doc/wiki/index.php?title=ShadeVis_(plugin)"
+    }
+  ]
+}
