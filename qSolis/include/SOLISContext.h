@@ -1,107 +1,81 @@
-//##########################################################################
-//#                                                                        #
-//#                                PCV                                     #
-//#                                                                        #
-//#  This program is free software; you can redistribute it and/or modify  #
-//#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 or later of the License.  #
-//#                                                                        #
-//#  This program is distributed in the hope that it will be useful,       #
-//#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
-//#  GNU General Public License for more details.                          #
-//#                                                                        #
-//#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
-//#                                                                        #
-//##########################################################################
+#pragma once
 
-#ifndef SOLIS_CONTEXT_HEADER
-#define SOLIS_CONTEXT_HEADER
+#include "SOLIS.h"
+#include "SOLISBackend.h"
 
-//CCCoreLib
 #include <GenericCloud.h>
 #include <GenericMesh.h>
 
-//system
+#include <cstdint>
 #include <vector>
 
-class QGLPixelBuffer;
+class QOpenGLBuffer;
+class QOpenGLContext;
+class QOpenGLFramebufferObject;
+class QSurface;
 
-//! PCV (Portion de Ciel Visible / Ambiant Illumination) OpenGL context
-/** Similar to Cignoni's ShadeVis
-**/
-class SOLISContext
+class SOLISContext final : public SOLISAccumulationBackend
 {
-	public:
-		//! Default constructor
-		SOLISContext();
+public:
+    SOLISContext();
+    ~SOLISContext() override;
 
-		//! Destructor
-		virtual ~SOLISContext();
+    bool init(unsigned W,
+              unsigned H,
+              CCCoreLib::GenericCloud* cloud,
+              CCCoreLib::GenericMesh* mesh,
+              bool closedMesh,
+              double depthBias,
+              bool parallelCpuProjection,
+              unsigned cpuThreadCount) override;
 
-		//! Initialization
-		/** \param W OpenGL render context width (pixels)
-			\param H OpenGL render context height (pixels)
-			\param cloud associated cloud (or mesh vertices)
-			\param mesh associated mesh (if any)
-			\param closedMesh whether mesh is closed (faster) or not (need more memory)
-			\return initialization success
-		**/
-		bool init(	unsigned W,
-					unsigned H,
-					CCCoreLib::GenericCloud* cloud,
-					CCCoreLib::GenericMesh* mesh = nullptr,
-					bool closedMesh = true);
+    int accumulate(std::vector<double>& accumulator,
+                   const CCVector3d& lightTravelDirection,
+                   double scalarWeight,
+                   solis::SpatialMode spatialMode,
+                   const std::vector<CCVector3d>* normals) override;
 
-		//! Set the viewing directions
-		void setViewDirection(const CCVector3& V);
+private:
+    void associateToEntity(CCCoreLib::GenericCloud* cloud, CCCoreLib::GenericMesh* mesh);
+    bool buildGeometryCache();
+    bool glInit();
+    bool makeCurrent();
+    bool uploadGeometry();
+    bool drawEntity();
+    bool projectVisible(unsigned pointIndex,
+                        const double* viewMatrix,
+                        const double* projectionMatrix,
+                        const int* viewport,
+                        const CCVector3d& surfaceToSource,
+                        solis::SpatialMode spatialMode,
+                        const std::vector<CCVector3d>* normals,
+                        double scalarWeight,
+                        double& contribution) const;
 
-		//! Increments the visibility counter for points viewed in the current pass (see setViewDirection)
-		/** \param visibilityCount per-vertex visibility count (same size as the number of vertices)
-			\return number of vertices seen during this pass
-		**/
-		int GLAccumPixel(std::vector<int>& visibilityCount);
-		int GLAccumPixelIrradiance(std::vector<double>& visibilityCount, double irradiance);
+    CCCoreLib::GenericCloud* m_vertices = nullptr;
+    CCCoreLib::GenericMesh* m_mesh = nullptr;
+    CCVector3 m_entityCenter{0, 0, 0};
+    PointCoordinateType m_entityDiagonal = 0;
 
-	protected:
-		void glInit();
-		void drawEntity();
-		void associateToEntity(CCCoreLib::GenericCloud* cloud, CCCoreLib::GenericMesh* mesh = nullptr);
+    QSurface* m_glSurface = nullptr;
+    QOpenGLContext* m_glContext = nullptr;
+    QOpenGLFramebufferObject* m_framebuffer = nullptr;
+    QOpenGLBuffer* m_pixelBuffer = nullptr;
+    QOpenGLBuffer* m_vertexBuffer = nullptr;
+    QOpenGLBuffer* m_indexBuffer = nullptr;
 
-		//! Displayed entity (cloud or mesh vertices)
-		CCCoreLib::GenericCloud* m_vertices;
+    unsigned m_width = 0;
+    unsigned m_height = 0;
+    bool m_meshIsClosed = false;
+    double m_depthBias = 1.0e-3;
+    bool m_parallelCpuProjection = true;
+    unsigned m_cpuThreadCount = 1;
 
-		//! Displayed entity (mesh - optional)
-		CCCoreLib::GenericMesh* m_mesh;
-
-		//zoom courant
-		PointCoordinateType m_zoom;
-		//translation vers le centre de l'entitee a afficher
-		CCVector3 m_viewCenter;
-
-		//associated pixel buffer
-		QGLPixelBuffer* m_pixBuffer;
-
-		//! Pixel buffer width (pixels)
-		unsigned m_width;
-		//! Pixel buffer height (pixels)
-		unsigned m_height;
-
-		//! Model view matrix size (OpenGL)
-		/** \warning Never pass a 'constant initializer' by reference
-		**/
-		static const unsigned OPENGL_MATRIX_SIZE = 16;
-
-		//! Current model view matrix
-		float m_viewMat[OPENGL_MATRIX_SIZE];
-
-		//! Depth buffer
-		float* m_snapZ;
-		//! Color buffer
-		unsigned char* m_snapC;
-
-		//! Whether displayed mesh is closed or not
-		bool m_meshIsClosed;
+    std::vector<float> m_snapZ;
+    std::vector<uint8_t> m_snapC;
+    std::vector<CCVector3d> m_points;
+    std::vector<PointCoordinateType> m_drawVertices;
+    std::vector<unsigned> m_indices;
+    bool m_useIndexBuffer = false;
+    unsigned m_drawVertexCount = 0;
 };
-
-#endif

@@ -1,0 +1,295 @@
+name: Build and release qSOLIS
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      cloudcompare_ref:
+        description: "CloudCompare tag/branch/commit to build against"
+        required: false
+        default: "v2.14.beta2"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qsolis-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CLOUDCOMPARE_REPOSITORY: https://github.com/CloudCompare/CloudCompare.git
+  DEFAULT_CLOUDCOMPARE_REF: v2.14.beta2
+
+jobs:
+  prepare-release:
+    name: Prepare draft release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout qSOLIS
+        uses: actions/checkout@v7
+
+      - name: Validate tag matches VERSION
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "$VERSION" != "$TAG_VERSION" ]]; then
+            echo "VERSION file ($VERSION) does not match tag ($GITHUB_REF_NAME)" >&2
+            exit 1
+          fi
+
+      - name: Create draft GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; it will be updated."
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --verify-tag \
+              --draft \
+              --title "qSOLIS $VERSION" \
+              --notes-file RELEASE_NOTES.md
+          fi
+
+  build:
+    name: ${{ matrix.name }}
+    needs: prepare-release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x86_64 (Ubuntu 24.04 / GCC)
+            os: ubuntu-24.04
+            package_id: linux-x86_64-ubuntu24.04-gcc
+            conda_file: ""
+            conda_arch: ""
+            conda_library_dir: ""
+          - name: Windows x64 (MSVC)
+            os: windows-latest
+            package_id: windows-x64-msvc
+            conda_file: .ci/conda-win.yml
+            conda_arch: x64
+            conda_library_dir: Library
+          - name: macOS arm64 (Clang, unsigned)
+            os: macos-latest
+            package_id: macos-arm64-clang-unsigned
+            conda_file: .ci/conda-macos.yml
+            conda_arch: arm64
+            conda_library_dir: .
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout qSOLIS
+        uses: actions/checkout@v7
+
+      - name: Resolve CloudCompare reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.cloudcompare_ref }}" ]]; then
+            echo "CLOUDCOMPARE_REF=${{ inputs.cloudcompare_ref }}" >> "$GITHUB_ENV"
+          else
+            echo "CLOUDCOMPARE_REF=${DEFAULT_CLOUDCOMPARE_REF}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Clone CloudCompare
+        shell: bash
+        run: |
+          set -euo pipefail
+          git init cc
+          git -C cc remote add origin "$CLOUDCOMPARE_REPOSITORY"
+          git -C cc fetch --depth 1 origin "$CLOUDCOMPARE_REF"
+          git -C cc checkout --detach FETCH_HEAD
+          git -C cc submodule update --init --recursive
+          echo "CLOUDCOMPARE_COMMIT=$(git -C cc rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Integrate qSOLIS source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/install_into_cloudcompare.py cc --force
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -qy \
+            cmake ninja-build python3 zip xvfb xauth \
+            qt6-base-dev qt6-svg-dev qt6-tools-dev qt6-tools-dev-tools qt6-5compat-dev \
+            libtbb-dev libavcodec-dev libavformat-dev \
+            libdraco-dev libeigen3-dev libcgal-dev libgdal-dev \
+            liblaszip-dev libxerces-c-dev zlib1g-dev \
+            libopencv-dev libboost-dev libboost-iostreams-dev libboost-system-dev \
+            libpcap-dev libflann-dev libglu1-mesa-dev libgl1-mesa-dev libgl1-mesa-dri \
+            udev libudev-dev libhidapi-dev libusb-1.0-0-dev
+
+      - name: Install Windows/macOS dependencies
+        if: runner.os != 'Linux'
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          architecture: ${{ matrix.conda_arch }}
+          auto-activate: false
+          activate-environment: CloudCompareDev
+          environment-file: cc/${{ matrix.conda_file }}
+          channels: conda-forge
+          conda-remove-defaults: "true"
+
+      - name: Configure MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Select MSVC compiler
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          "CC=cl.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "CXX=cl.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Configure CloudCompare + qSOLIS (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S cc -B cc/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/stage" \
+            -DEIGEN_ROOT_DIR=/usr/include/eigen3 \
+            -DOPTION_BUILD_CCVIEWER=OFF \
+            -DPLUGIN_IO_QCORE=ON \
+            -DPLUGIN_STANDARD_QSOLIS=ON \
+            -DBUILD_TESTING=ON \
+            -DSOLIS_BUILD_TESTS=ON
+
+      - name: Configure CloudCompare + qSOLIS (Windows/macOS)
+        if: runner.os != 'Linux'
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          CONDA_ROOT="${CONDA_PREFIX//\\//}"
+          WORKSPACE_ROOT="${GITHUB_WORKSPACE//\\//}"
+          CONDA_LIB_DIR="$CONDA_ROOT/${{ matrix.conda_library_dir }}"
+          EIGEN_ROOT_DIR="$CONDA_LIB_DIR/include/eigen3"
+
+          cmake -S cc -B cc/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$WORKSPACE_ROOT/stage" \
+            -DCMAKE_PREFIX_PATH="$CONDA_LIB_DIR" \
+            -DEIGEN_ROOT_DIR="$EIGEN_ROOT_DIR" \
+            -DOPTION_BUILD_CCVIEWER=OFF \
+            -DPLUGIN_IO_QCORE=ON \
+            -DPLUGIN_STANDARD_QSOLIS=ON \
+            -DBUILD_TESTING=ON \
+            -DSOLIS_BUILD_TESTS=ON
+
+      - name: Build
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          cmake --build cc/build --parallel
+
+      - name: Run qSOLIS unit test
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          ctest --test-dir cc/build --output-on-failure -R '^qsolis_'
+
+      - name: Install to staging tree
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          cmake --install cc/build
+
+      - name: Run frozen OpenGL regression suite (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          CC_BIN="$(find "$GITHUB_WORKSPACE/stage" -type f -name CloudCompare -perm -111 | head -n 1)"
+          if [[ -z "$CC_BIN" ]]; then
+            echo "Could not locate installed CloudCompare executable" >&2
+            find "$GITHUB_WORKSPACE/stage" -maxdepth 4 -type f | sort
+            exit 1
+          fi
+          echo "Testing installed executable: $CC_BIN"
+          LIBGL_ALWAYS_SOFTWARE=1 QT_QPA_PLATFORM=xcb xvfb-run -a \
+            qSolis/tests/regression/run_qsolis_regression.sh \
+            "$CC_BIN" \
+            "$GITHUB_WORKSPACE/regression-output"
+
+      - name: Package plugin binary
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          python tools/package_ci_binary.py \
+            --stage "$GITHUB_WORKSPACE/stage" \
+            --platform "${{ matrix.package_id }}" \
+            --cloudcompare-ref "$CLOUDCOMPARE_REF" \
+            --cloudcompare-commit "$CLOUDCOMPARE_COMMIT" \
+            --qsolis-commit "$GITHUB_SHA" \
+            --output "$GITHUB_WORKSPACE/dist"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: qsolis-${{ matrix.package_id }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach platform package to draft GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash -el {0}
+        run: |
+          set -euo pipefail
+          gh release upload "$GITHUB_REF_NAME" \
+            dist/*.zip \
+            dist/*.sha256 \
+            --clobber
+
+  publish-release:
+    name: Publish GitHub Release
+    if: github.ref_type == 'tag'
+    needs:
+      - prepare-release
+      - build
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout qSOLIS
+        uses: actions/checkout@v7
+
+      - name: Attach documentation and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+
+          if [[ -f "docs/qSOLIS_User_Manual_v${VERSION}.pdf" ]]; then
+            gh release upload "$GITHUB_REF_NAME" \
+              "docs/qSOLIS_User_Manual_v${VERSION}.pdf" \
+              --clobber
+          fi
+
+          gh release edit "$GITHUB_REF_NAME" \
+            --title "qSOLIS $VERSION" \
+            --notes-file RELEASE_NOTES.md \
+            --draft=false
+
+          echo "Published qSOLIS $VERSION"

@@ -1,5 +1,5 @@
 <RCC>
-    <qresource prefix="/CC/plugin/qSOLIS">
+    <qresource prefix="/CC/plugin/qSolis">
         <file>info.json</file>
         <file>images/SOLISIcon.png</file>
     </qresource>

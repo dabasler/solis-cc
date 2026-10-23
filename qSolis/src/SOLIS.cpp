@@ -1,416 +1,441 @@
-//Initialization Generatte Rays,...
-
-//##########################################################################
-//#                                                                        #
-//#                                SOLIS                                     #
-//#                                                                        #
-//#  This program is free software; you can redistribute it and/or modify  #
-//#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 or later of the  #
-//#  License.                                                              #
-//#                                                                        #
-//#  This program is distributed in the hope that it will be useful,       #
-//#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
-//#  GNU General Public License for more details.                          #
-//#                                                                        #
-//#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
-//#                                                                        #
-//##########################################################################
-
 #include "SOLIS.h"
-#include "SOLISContext.h"
+#include "SOLISBackend.h"
+#include "SOLISSolarModel.h"
 
-//Qt
-#include <QString>
+#include <CCMath.h>
 
-#ifdef USE_VLD
-//VLD
-#include <vld.h>
-#endif
-
-//System
 #include <algorithm>
 #include <cassert>
-#include <cstring>
-
-#include <math.h>
-extern "C" {
-    #include <solrad.h>
-}
-
+#include <cmath>
+#include <limits>
+#include <new>
 
 using namespace CCCoreLib;
 
-static int gcd(int num1, int num2)
+namespace
 {
-	int remainder = (num2 % num1);
+constexpr double Pi = 3.1415926535897932384626433832795;
 
-	return (remainder != 0 ? gcd(remainder, num1) : num1);
-}
-
-//! Sample points on the unit sphere
-/** Transcripted from MATLAB's script "partsphere.m" by Paul Leopardi,
-	2003-10-13, for UNSW School of Mathematics.
-
-	As points are sampled on the unit sphere, they can also
-	be considered as directions.
-	WARNING: returned array is on the user responsibilty!
-
-	\param N number of desired sampled directions
-	\param[out] dirs set of N points
-	\return success
-**/
-static bool SampleSphere(unsigned N, std::vector<CCVector3>& dirs)
+double angularDistanceDeg(const CCVector3d& a, const CCVector3d& b)
 {
-	static const double c_eps = 2.2204e-16;
-	static const double c_twist = 4.0;
-
-	if (N == 0)
-	{
-		assert(false);
-		return false;
-	}
-
-	try
-	{
-		dirs.resize(N, CCVector3(0, 0, 1));
-	}
-	catch (const std::bad_alloc&)
-	{
-		//not enough memory
-		return false;
-	}
-
-	if (N == 1)
-	{
-		return true;
-	}
-
-	try
-	{
-		double area = (4 * M_PI) / N;
-		double beta = acos(1.0 - 2.0 / N); //return in [0,pi/2] as '1-2/N' goes from 0 to 1 when N --> inf
-		double gamma = M_PI - 2 * beta; //in [0,pi]
-		double fuzz = c_eps * 2 * N;
-
-		int Ltemp = static_cast<int>(ceil(gamma / sqrt(area) - fuzz));
-		int L = 2 + std::max(Ltemp, 1);
-
-		//init mbar
-		std::vector<double> mbar;
-		mbar.resize(L, 0);
-		assert(L >= 3);
-		{
-			mbar[0] = 1.0;
-			double theta = gamma / (L - 2);
-			for (int i = 1; i < L - 1; ++i)
-			{
-				mbar[i] = N * (cos(theta * (i - 1) + beta) - cos(theta * i + beta)) / 2;
-			}
-			mbar[L - 1] = 1.0;
-		}
-
-		//init m
-		std::vector<int> m;
-		m.resize(L, 0);
-		{
-			m[0] = 1;
-
-			double alpha = 0.0;
-			for (int i = 1; i < L; ++i)
-			{
-				double f = floor(mbar[i] + alpha + fuzz);
-				if ((mbar[i] - f) >= 0.5)
-					f = ceil(mbar[i] + alpha - fuzz);
-				m[i] = static_cast<int>(f);
-
-				alpha += mbar[i] - m[i];
-			}
-		}
-
-		//now we can build the rays
-		{
-			std::vector<double> offset;
-			offset.resize(L - 1, 0);
-
-			double z = 1.0 - static_cast<double>(2 + m[1]) / N;
-
-			unsigned int rayIndex = 1; //the first one is already (0,0,1)
-			for (int i = 1; i < L - 1; ++i)
-			{
-				if (m[i - 1] != 0 && m[i] != 0)
-				{
-					offset[i] = offset[i - 1]
-						+ static_cast<double>(gcd(m[i], m[i - 1])) / (2 * m[i] * m[i - 1])
-						+ std::min<double>(c_twist, floor(m[i - 1] / c_twist)) / m[i - 1];
-				}
-				else
-				{
-					offset[i] = 0.0;
-				}
-
-				double temp = static_cast<double>(m[i]) / N;
-
-				double h = cos((acos(z + temp) + acos(z - temp)) / 2);
-				double r = sqrt(1.0 - h*h);
-
-				for (int j = 0; j < m[i]; ++j)
-				{
-					double theta = 2.0*M_PI * (offset[i] + static_cast<double>(j) / m[i]);
-
-					dirs[rayIndex++] = CCVector3(static_cast<PointCoordinateType>(r*cos(theta)),
-						static_cast<PointCoordinateType>(r*sin(theta)),
-						static_cast<PointCoordinateType>(h));
-				}
-
-				z -= static_cast<double>(m[i] + m[i + 1]) / N;
-			}
-
-			assert(rayIndex + 1 == N);
-		}
-	}
-	catch (const std::bad_alloc&)
-	{
-		//not enough memory
-		return false;
-	}
-
-	dirs[N - 1] = CCVector3(0, 0, -1);
-
-	return true;
+    const double dot = std::max(-1.0, std::min(1.0, a.dot(b)));
+    return std::acos(dot) * 180.0 / Pi;
 }
 
-// Caluclate Sum of diff irradiance over selected time
-double SOLIS::totalDiffIrradiance (double doyFrom,double doyTo,double timestep,double lat,double lon,double elevation){
-	double irad=0;
-	unsigned count = (unsigned) floor( (doyTo-doyFrom)/(timestep/24/60) ); // Max number of timepoints
-	for (size_t i = 0; i < count; ++i)
-		{
-			irad += DiffuseRadiation (doyFrom + i*timestep/60/24, lat, lon, lon, 0, elevation, 0);
-		}
-	return (irad);
-}
-
-// This function is the same as in PCV::GenerateRays and used to estimate diffuse irradiance: We calulate PCV and multiply with daily sum of diffusive radiation
-bool SOLIS::GenerateDiffRays(unsigned numberOfRays, std::vector<CCVector3>& rays)
-{		
-	//generates light directions
-	unsigned rayCount = numberOfRays*2; 
-	if (!SampleSphere(rayCount, rays))
-	{
-		return false;
-	}
-	//we keep only the light directions that meets input parameters (non predictible if not in 360° mode!) 
-	unsigned lastIndex = 0;
-	for (size_t i = 0; i < rays.size(); ++i)
-	{
-		if (rays[i].z < 0)
-		{
-			if (lastIndex != i)
-			{
-				rays[lastIndex] = rays[i];
-			}
-			++lastIndex;
-		}
-	}
-	rayCount = lastIndex;
-	rays.resize(rayCount);
-	return true;
-}
-
-//This function is the same as in PCV and used to DIFFUSE Irradiance: We calulate PCV and multiply with dayly sum of diffusive radiation (REMOVED MODE360)
-bool SOLIS::GenerateSunRays( double doyFrom,double doyTo,double timestep,double lat,double lon,double elevation, std::vector<CCVector3>& rays, std::vector<double>& irradiance)
-{		
-	    // SOLIS MODIFICATION: Calculate normals based on sun position, add direct radiation walues in W
-		unsigned rayCount = (unsigned) floor( (doyTo-doyFrom)/(timestep/24/60) ); // Max number of Rays
-		try
-		{
-			rays.resize(rayCount);
-			irradiance.resize(rayCount);
-		}
-		catch (std::bad_alloc)
-		{
-			return false;
-		}
-		//we keep only the light directions with positive Altitude
-		unsigned lastIndex=0;
-		double doy,alt,azm,irad;
-     	//we keep only the light directions BETWEEN SUNRISE AND SUNSET
-		for (size_t i = 0; i < rayCount; ++i)
-		{
-			doy = doyFrom + i*(timestep/24/60);
-			alt = Altitude (doy, lat, lon, lon, 0);
-			azm = Azimuth  (doy, lat, lon, lon, 0);
-			irad = DirectRadiation  ( doy, lat, lon, lon, 0, elevation, 0, 0);
-			if (alt > 0)
-			{
-				//Calculate Sun Rays:
-				rays[lastIndex] =  CCVector3(static_cast<PointCoordinateType> (  sin(azm*(M_PI/180.0))),
-						                     static_cast<PointCoordinateType> (  cos(azm*(M_PI/180.0))),
-						                     static_cast<PointCoordinateType> ( - sin(alt*(M_PI/180.0)))
-											 );
-				irradiance[lastIndex] = irad;
-				++lastIndex;
-			}
-		}
-		rays.resize(lastIndex);
-		irradiance.resize(lastIndex);
-		return true;	
-}
-
-/*
-// IS THIS USED FROM COMMANDLINE? TESTS?
-int SOLIS::Launch(
-	double doyFrom,
-	double doyTo,
-	double timestep,
-	double timestep,
-				unsigned numberOfRays,
-				GenericCloud* vertices,
-				GenericMesh* mesh,
-				bool meshIsClosed,
-				unsigned width,
-				unsigned height,
-				CCCoreLib::GenericProgressCallback* progressCb,
-				const QString& entityName)
+void appendOrMergeDirectSample(std::vector<solis::RaySample>& samples,
+                               const solis::RaySample& sample,
+                               double toleranceDeg)
 {
-	//generates light directions
-	std::vector<CCVector3> rays;
-	std::vector<CCVector3> irradiance;
-	
-	
-	if (!GenerateRays(numberOfRays, rays)) // GET RAYS HERE ANN IRRADIANCE PARAMETER
-	{
-		return -2;
-	}
+    if (samples.empty() || toleranceDeg <= 0.0
+        || angularDistanceDeg(samples.back().direction, sample.direction) > toleranceDeg)
+    {
+        samples.push_back(sample);
+        return;
+    }
 
-	if (!Launch(rays, irradiance, diffuse, vertices, mesh, meshIsClosed, width, height, progressCb, entityName))
-	{
-		return -1;
-	}
+    solis::RaySample& target = samples.back();
+    const double oldEnergyWeight = target.irradianceWm2 * target.weightHours;
+    const double newEnergyWeight = sample.irradianceWm2 * sample.weightHours;
+    const double totalEnergyWeight = oldEnergyWeight + newEnergyWeight;
+    const double totalTime = target.weightHours + sample.weightHours;
 
-	return static_cast<int>(rays.size());
+    // Direction is time-weighted. Irradiance is energy/time weighted below. This also keeps
+    // accelerated direct-visibility calculations unbiased by irradiance magnitude.
+    CCVector3d mergedDirection = target.direction * target.weightHours + sample.direction * sample.weightHours;
+    if (mergedDirection.norm2() > 1.0e-20)
+        mergedDirection.normalize();
+    else
+        mergedDirection = target.direction;
+
+    target.direction = mergedDirection;
+    target.irradianceWm2 = (totalTime > 0.0 ? totalEnergyWeight / totalTime : 0.0);
+    target.weightHours = totalTime;
 }
-*/
 
-
-bool SOLIS::Launch(
-                 const std::vector<CCVector3>& rays,
-				 const std::vector<double>& irradiance,
-				 bool modeDirect,
-				 double conversion,
-				 CCCoreLib::GenericCloud* vertices,
-				 CCCoreLib::GenericMesh* mesh/*=0*/,
-				 bool meshIsClosed/*=false*/,
-				 unsigned width/*=1024*/,
-				 unsigned height/*=1024*/,
-				 CCCoreLib::GenericProgressCallback* progressCb/*=0*/,
-				 const QString& entityName/*=QString()*/)
+double sampleDHI(double dayOfYear, const solis::CalculationOptions& options)
 {
-	if (rays.empty())
-		return false;
-
-	if (!vertices || !vertices->enableScalarField())
-		return false;
-
-	//vertices/points
-	unsigned numberOfPoints = vertices->size();
-	//rays
-	unsigned numberOfRays = static_cast<unsigned>(rays.size());
-
-	//for each vertex we keep count of the number of light directions for which it is "illuminated"
-	std::vector<double> visibilityCountDirect;
-	std::vector<int> visibilityCount;
-	
-	if (modeDirect)	{
-		try
-		{
-			visibilityCountDirect.resize(numberOfPoints, 0);
-		}
-		catch (const std::bad_alloc&)
-		{
-			//not enough memory?
-			return false;
-		}	
-	}
-	else{	
-		try
-		{
-			visibilityCount.resize(numberOfPoints, 0);
-		}
-		catch (const std::bad_alloc&)
-		{
-			//not enough memory?
-			return false;
-		}	
-	}
-	
-	/*** Main illumination loop ***/
-	CCCoreLib::NormalizedProgress nProgress(progressCb, numberOfRays);
-	if (progressCb)
-	{
-		if (progressCb->textCanBeEdited())
-		{
-			progressCb->setMethodTitle("ShadeVis|SOLIS");
-			QString infoStr;
-			if (!entityName.isEmpty())
-				infoStr = entityName + "\n";
-			infoStr.append(QString("Rays: %1").arg(numberOfRays));
-			if (mesh)
-				infoStr.append(QString("\nFaces: %1").arg(mesh->size()));
-			else
-				infoStr.append(QString("\nVertices: %1").arg(numberOfPoints));
-			progressCb->setInfo(qPrintable(infoStr));
-		}
-		progressCb->update(0);
-		progressCb->start();
-	}
-
-	bool success = true;
-
-	//must be done after progress dialog display!
-	SOLISContext win;
-	if (win.init(width, height, vertices, mesh, meshIsClosed))
-	{
-		for (unsigned i = 0; i < numberOfRays; ++i)
-		{
-			//set current 'light' direction
-			win.setViewDirection(rays[i]);
-
-			//flag viewed vertices 
-			if (modeDirect)	win.GLAccumPixelIrradiance(visibilityCountDirect,irradiance[i]); // SOLIS MODIFICATION: accumulate solar radiation 
-			else win.GLAccumPixel(visibilityCount); // SOLIS MODIFICATION: accumulate solar radiation 
-
-			if (progressCb && !nProgress.oneStep())
-			{
-				success = false;
-				break;
-			}
-		}
-		if (success)
-		{
-			//we convert per-vertex accumulators to an 'intensity' scalar field
-			for (unsigned j = 0; j < numberOfPoints; ++j)
-			{
-				if (modeDirect){
-					ScalarType visValue = static_cast<ScalarType>( visibilityCountDirect[j]*conversion );
-					vertices->setPointScalarValue(j, visValue);
-				} else {
-					ScalarType visValue = static_cast<ScalarType> ( (1.0*visibilityCount[j]) / numberOfRays) * irradiance[0]*conversion; // POV * Total Diffuse Irradiance 
-					vertices->setPointScalarValue(j, visValue);
-				}
-			}
-		}
-	}
-	else
-	{
-		success = false;
-	}
-
-	return success;
+    const solis::SolarPosition pos = solis::SolarModel::position(dayOfYear, options.site);
+    return solis::SolarModel::clearSky(dayOfYear, options.site, pos).dhiWm2;
 }
 
+bool initAccumulator(GenericCloud* vertices, std::vector<double>& accumulator)
+{
+    if (!vertices || !vertices->enableScalarField())
+        return false;
+    try
+    {
+        accumulator.assign(vertices->size(), 0.0);
+    }
+    catch (const std::bad_alloc&)
+    {
+        return false;
+    }
+    return true;
+}
+
+void writeAccumulator(GenericCloud* vertices, const std::vector<double>& accumulator, double scale)
+{
+    for (unsigned i = 0; i < vertices->size(); ++i)
+    {
+        const double value = std::max(0.0, accumulator[i] * scale);
+        vertices->setPointScalarValue(i, static_cast<ScalarType>(value));
+    }
+}
+
+void setupProgress(GenericProgressCallback* progressCb,
+                   const QString& title,
+                   const QString& entityName,
+                   unsigned rayCount,
+                   GenericMesh* mesh,
+                   unsigned pointCount)
+{
+    if (!progressCb)
+        return;
+
+    if (progressCb->textCanBeEdited())
+    {
+        progressCb->setMethodTitle(qPrintable(title));
+        QString info = entityName;
+        if (!info.isEmpty())
+            info += QLatin1Char('\n');
+        info += QStringLiteral("Rays: %1").arg(rayCount);
+        info += mesh ? QStringLiteral("\nFaces: %1").arg(mesh->size())
+                     : QStringLiteral("\nVertices: %1").arg(pointCount);
+        progressCb->setInfo(qPrintable(info));
+    }
+    progressCb->update(0);
+    progressCb->start();
+}
+} // namespace
 
 
+bool SOLIS::ValidateOptions(const solis::CalculationOptions& o, QString* errorMessage)
+{
+    auto fail = [errorMessage](const QString& message)
+    {
+        if (errorMessage)
+            *errorMessage = message;
+        return false;
+    };
 
+    // The integer part is a 1-based day-of-year and the fractional part is
+    // time-of-day. Therefore day 366 at 12:00 is represented by 366.5 and is
+    // valid, while 367.0 is not.
+    if (!std::isfinite(o.time.dayOfYear) || o.time.dayOfYear < 1.0 || o.time.dayOfYear >= 367.0)
+        return fail(QStringLiteral("day-of-year must be >= 1 and < 367 (fractional part is time-of-day)"));
+    if (!std::isfinite(o.site.latitudeDeg) || o.site.latitudeDeg < -90.0 || o.site.latitudeDeg > 90.0)
+        return fail(QStringLiteral("latitude must be in [-90, 90] degrees"));
+    if (!std::isfinite(o.site.longitudeDeg) || o.site.longitudeDeg < -180.0 || o.site.longitudeDeg > 180.0)
+        return fail(QStringLiteral("longitude must be in [-180, 180] degrees (east positive)"));
+    if (!std::isfinite(o.site.elevationM))
+        return fail(QStringLiteral("elevation must be finite"));
+    if (!std::isfinite(o.site.linkeTurbidity) || o.site.linkeTurbidity < 1.0 || o.site.linkeTurbidity > 12.0)
+        return fail(QStringLiteral("Linke turbidity must be in [1, 12]"));
+    if (o.site.timeMode == solis::TimeMode::LocalFixedOffset
+        && (!std::isfinite(o.site.utcOffsetHours) || o.site.utcOffsetHours < -14.0 || o.site.utcOffsetHours > 14.0))
+    {
+        return fail(QStringLiteral("UTC offset must be in [-14, 14] hours"));
+    }
+    if (o.render.resolution == 0)
+        return fail(QStringLiteral("render resolution must be greater than zero"));
+    if (!std::isfinite(o.render.depthBias) || o.render.depthBias < 0.0 || o.render.depthBias > 0.05)
+        return fail(QStringLiteral("depth bias must be in [0, 0.05]"));
+    if (o.sampling.diffuseRayCount == 0)
+        return fail(QStringLiteral("diffuse ray count must be greater than zero"));
+    if (!std::isfinite(o.sampling.directAngularToleranceDeg)
+        || o.sampling.directAngularToleranceDeg < 0.0
+        || o.sampling.directAngularToleranceDeg > 180.0)
+    {
+        return fail(QStringLiteral("direct angular tolerance must be in [0, 180] degrees"));
+    }
+    if (o.time.mode != solis::TemporalMode::Instantaneous)
+    {
+        if (!std::isfinite(o.time.durationHours) || o.time.durationHours <= 0.0)
+            return fail(QStringLiteral("duration must be greater than zero for mean/energy output"));
+        if (!std::isfinite(o.time.timestepMinutes) || o.time.timestepMinutes <= 0.0)
+            return fail(QStringLiteral("timestep must be greater than zero for mean/energy output"));
+    }
+
+    if (errorMessage)
+        errorMessage->clear();
+    return true;
+}
+
+bool SOLIS::GenerateDirectSamples(const solis::CalculationOptions& options,
+                                  std::vector<solis::RaySample>& samples)
+{
+    samples.clear();
+    if (!ValidateOptions(options))
+        return false;
+
+    try
+    {
+        if (options.time.mode == solis::TemporalMode::Instantaneous)
+        {
+            const solis::SolarPosition pos = solis::SolarModel::position(options.time.dayOfYear, options.site);
+            if (pos.altitudeDeg <= 0.0)
+                return true;
+            const solis::ClearSkyIrradiance cs = solis::SolarModel::clearSky(options.time.dayOfYear, options.site, pos);
+            if (cs.dniWm2 > 0.0)
+                samples.push_back({pos.directionToScene, cs.dniWm2, 1.0});
+            return true;
+        }
+
+        const double stepHours = options.time.timestepMinutes / 60.0;
+        const double duration = options.time.durationHours;
+        const size_t estimated = static_cast<size_t>(std::ceil(duration / stepHours));
+        samples.reserve(estimated);
+
+        double elapsed = 0.0;
+        while (elapsed < duration - 1.0e-12)
+        {
+            const double dt = std::min(stepHours, duration - elapsed);
+            const double sampleDoy = options.time.dayOfYear + (elapsed + 0.5 * dt) / 24.0;
+            const solis::SolarPosition pos = solis::SolarModel::position(sampleDoy, options.site);
+            if (pos.altitudeDeg > 0.0)
+            {
+                const solis::ClearSkyIrradiance cs = solis::SolarModel::clearSky(sampleDoy, options.site, pos);
+                if (cs.dniWm2 > 0.0)
+                {
+                    const solis::RaySample sample{pos.directionToScene, cs.dniWm2, dt};
+                    if (options.sampling.acceleratedDirectSampling)
+                        appendOrMergeDirectSample(samples, sample, options.sampling.directAngularToleranceDeg);
+                    else
+                        samples.push_back(sample);
+                }
+            }
+            elapsed += dt;
+        }
+    }
+    catch (const std::bad_alloc&)
+    {
+        return false;
+    }
+    return true;
+}
+
+bool SOLIS::GenerateDiffuseRays(unsigned N, std::vector<CCVector3d>& rays)
+{
+    rays.clear();
+    if (N == 0)
+        return false;
+
+    try
+    {
+        rays.resize(N);
+    }
+    catch (const std::bad_alloc&)
+    {
+        return false;
+    }
+
+    // Fibonacci lattice with z uniformly distributed in (0,1): equal solid-angle samples.
+    const double goldenAngle = Pi * (3.0 - std::sqrt(5.0));
+    for (unsigned i = 0; i < N; ++i)
+    {
+        const double z = (static_cast<double>(i) + 0.5) / static_cast<double>(N);
+        const double r = std::sqrt(std::max(0.0, 1.0 - z * z));
+        const double phi = goldenAngle * static_cast<double>(i);
+        const CCVector3d surfaceToSky(r * std::cos(phi), r * std::sin(phi), z);
+        rays[i] = -surfaceToSky;
+    }
+    return true;
+}
+
+double SOLIS::AggregateDiffuseIrradiance(const solis::CalculationOptions& options)
+{
+    if (!ValidateOptions(options))
+        return std::numeric_limits<double>::quiet_NaN();
+
+    if (options.time.mode == solis::TemporalMode::Instantaneous)
+        return sampleDHI(options.time.dayOfYear, options);
+
+    const double stepHours = options.time.timestepMinutes / 60.0;
+    const double duration = options.time.durationHours;
+    double integralWh = 0.0;
+    double elapsed = 0.0;
+    while (elapsed < duration - 1.0e-12)
+    {
+        const double dt = std::min(stepHours, duration - elapsed);
+        const double sampleDoy = options.time.dayOfYear + (elapsed + 0.5 * dt) / 24.0;
+        integralWh += sampleDHI(sampleDoy, options) * dt;
+        elapsed += dt;
+    }
+
+    if (options.time.mode == solis::TemporalMode::MeanIrradiance)
+        return integralWh / duration;
+
+    return integralWh * energyUnitScale(options.time.energyUnit);
+}
+
+bool SOLIS::LaunchDirect(const std::vector<solis::RaySample>& samples,
+                         const solis::CalculationOptions& options,
+                         GenericCloud* vertices,
+                         GenericMesh* mesh,
+                         const std::vector<CCVector3d>* normals,
+                         GenericProgressCallback* progressCb,
+                         const QString& entityName,
+                         SOLISAccumulationBackend* backend)
+{
+    if (!ValidateOptions(options) || !vertices)
+        return false;
+    if (options.spatialMode == solis::SpatialMode::SurfaceIrradiance
+        && (!normals || normals->size() != vertices->size()))
+        return false;
+
+    std::vector<double> accumulator;
+    if (!initAccumulator(vertices, accumulator))
+        return false;
+
+    setupProgress(progressCb, QStringLiteral("SOLIS - direct"), entityName,
+                  static_cast<unsigned>(samples.size()), mesh, vertices->size());
+    NormalizedProgress progress(progressCb, std::max<unsigned>(1u, static_cast<unsigned>(samples.size())));
+
+    if (samples.empty())
+    {
+        writeAccumulator(vertices, accumulator, 1.0);
+        return true; // sun below horizon for the complete interval is a valid zero result
+    }
+
+    std::unique_ptr<SOLISAccumulationBackend> ownedBackend;
+    if (!backend)
+    {
+        ownedBackend = CreateSOLISAccumulationBackend();
+        backend = ownedBackend.get();
+        if (!backend || !backend->init(options.render.resolution,
+                                       options.render.resolution,
+                                       vertices,
+                                       mesh,
+                                       options.render.meshIsClosed,
+                                       options.render.depthBias,
+                                       options.render.parallelCpuProjection,
+                                       options.render.cpuThreadCount))
+            return false;
+    }
+
+    double totalTimeWeight = 0.0;
+    for (const solis::RaySample& sample : samples)
+        totalTimeWeight += sample.weightHours;
+
+    for (const solis::RaySample& sample : samples)
+    {
+        double scalarWeight = 1.0;
+        if (options.spatialMode == solis::SpatialMode::Visibility)
+        {
+            scalarWeight = (options.time.mode == solis::TemporalMode::Instantaneous)
+                         ? 1.0
+                         : sample.weightHours;
+        }
+        else
+        {
+            scalarWeight = sample.irradianceWm2;
+            if (options.time.mode != solis::TemporalMode::Instantaneous)
+                scalarWeight *= sample.weightHours;
+        }
+
+        const int visible = backend->accumulate(accumulator,
+                                                sample.direction,
+                                                scalarWeight,
+                                                options.spatialMode,
+                                                normals);
+        if (visible < 0)
+            return false;
+
+
+        if (progressCb && !progress.oneStep())
+            return false;
+    }
+
+    double scale = 1.0;
+    if (options.spatialMode == solis::SpatialMode::Visibility)
+    {
+        if (options.time.mode != solis::TemporalMode::Instantaneous)
+            scale = totalTimeWeight > 0.0 ? 1.0 / totalTimeWeight : 0.0;
+    }
+    else if (options.time.mode == solis::TemporalMode::MeanIrradiance)
+    {
+        scale = 1.0 / options.time.durationHours;
+    }
+    else if (options.time.mode == solis::TemporalMode::IntegratedEnergy)
+    {
+        scale = energyUnitScale(options.time.energyUnit);
+    }
+
+
+    writeAccumulator(vertices, accumulator, scale);
+    return true;
+}
+
+bool SOLIS::LaunchDiffuse(const std::vector<CCVector3d>& rays,
+                          double diffuseIrradiance,
+                          const solis::CalculationOptions& options,
+                          GenericCloud* vertices,
+                          GenericMesh* mesh,
+                          const std::vector<CCVector3d>* normals,
+                          GenericProgressCallback* progressCb,
+                          const QString& entityName,
+                          SOLISAccumulationBackend* backend)
+{
+    if (!ValidateOptions(options) || rays.empty() || !vertices || !std::isfinite(diffuseIrradiance))
+        return false;
+    if (options.spatialMode == solis::SpatialMode::SurfaceIrradiance
+        && (!normals || normals->size() != vertices->size()))
+        return false;
+
+    std::vector<double> accumulator;
+    if (!initAccumulator(vertices, accumulator))
+        return false;
+
+    setupProgress(progressCb, QStringLiteral("SOLIS - diffuse"), entityName,
+                  static_cast<unsigned>(rays.size()), mesh, vertices->size());
+    NormalizedProgress progress(progressCb, static_cast<unsigned>(rays.size()));
+
+    std::unique_ptr<SOLISAccumulationBackend> ownedBackend;
+    if (!backend)
+    {
+        ownedBackend = CreateSOLISAccumulationBackend();
+        backend = ownedBackend.get();
+        if (!backend || !backend->init(options.render.resolution,
+                                       options.render.resolution,
+                                       vertices,
+                                       mesh,
+                                       options.render.meshIsClosed,
+                                       options.render.depthBias,
+                                       options.render.parallelCpuProjection,
+                                       options.render.cpuThreadCount))
+            return false;
+    }
+
+    // Uniform hemisphere samples have solid angle 2*pi/N. For isotropic radiance L=DHI/pi,
+    // each irradiance sample therefore carries 2*DHI/N before cosine incidence.
+    const double rayWeight = (options.spatialMode == solis::SpatialMode::Visibility)
+                           ? 1.0 / static_cast<double>(rays.size())
+                           : 2.0 * diffuseIrradiance / static_cast<double>(rays.size());
+
+    for (const CCVector3d& ray : rays)
+    {
+        if (backend->accumulate(accumulator, ray, rayWeight, options.spatialMode, normals) < 0)
+            return false;
+        if (progressCb && !progress.oneStep())
+            return false;
+    }
+
+    writeAccumulator(vertices, accumulator, 1.0);
+    return true;
+}
+
+QString SOLIS::OutputUnit(const solis::CalculationOptions& options)
+{
+    if (options.spatialMode == solis::SpatialMode::Visibility)
+        return QStringLiteral("fraction");
+    if (options.time.mode == solis::TemporalMode::IntegratedEnergy)
+        return options.time.energyUnit == solis::EnergyUnit::KWhPerM2
+             ? QStringLiteral("kWh/m2")
+             : QStringLiteral("Wh/m2");
+    return QStringLiteral("W/m2");
+}
+
+double SOLIS::energyUnitScale(solis::EnergyUnit unit)
+{
+    return unit == solis::EnergyUnit::KWhPerM2 ? 0.001 : 1.0;
+}

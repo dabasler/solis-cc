@@ -1,93 +1,95 @@
-//##########################################################################
-//#                                                                        #
-//#                                PCV /SOLIS                              #
-//#                                                                        #
-//#  This program is free software; you can redistribute it and/or modify  #
-//#  it under the terms of the GNU Library General Public License as       #
-//#  published by the Free Software Foundation; version 2 or later of the License.  #
-//#                                                                        #
-//#  This program is distributed in the hope that it will be useful,       #
-//#  but WITHOUT ANY WARRANTY; without even the implied warranty of        #
-//#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the          #
-//#  GNU General Public License for more details.                          #
-//#                                                                        #
-//#          COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)             #
-//#               with modifications by David Basler                       #
-//##########################################################################
+#pragma once
 
-#ifndef MESH_ILLUMINATION_HEADER
-#define MESH_ILLUMINATION_HEADER
+#include "SOLISSolarModel.h"
 
-//CCCoreLib
 #include <GenericCloud.h>
-#include <GenericIndexedMesh.h>
+#include <GenericMesh.h>
 #include <GenericProgressCallback.h>
 
-//Qt
 #include <QString>
 
-//System
 #include <vector>
 
+class SOLISAccumulationBackend;
 
-//SOLIS algorithm to calcualte Solar radiation [based upon the PCV (Portion de Ciel Visible) | Ambient Occlusion] plugin for CloudCompare COPYRIGHT: EDF R&D / TELECOM ParisTech (ENST-TSI)
+namespace solis
+{
+enum class TemporalMode { Instantaneous, MeanIrradiance, IntegratedEnergy };
+enum class EnergyUnit { WhPerM2, KWhPerM2 };
+enum class SpatialMode { Visibility, HorizontalIrradiance, SurfaceIrradiance };
+
+struct TimeOptions
+{
+    TemporalMode mode = TemporalMode::Instantaneous;
+    double dayOfYear = 172.5;
+    double durationHours = 24.0;
+    double timestepMinutes = 5.0;
+    EnergyUnit energyUnit = EnergyUnit::WhPerM2;
+};
+
+struct RenderOptions
+{
+    unsigned resolution = 1024;
+    bool meshIsClosed = false;
+    double depthBias = 1.0e-3;
+    bool parallelCpuProjection = true;
+    unsigned cpuThreadCount = 0;
+};
+
+struct SamplingOptions
+{
+    bool acceleratedDirectSampling = false;
+    double directAngularToleranceDeg = 0.1;
+    unsigned diffuseRayCount = 256;
+};
+
+struct CalculationOptions
+{
+    Site site;
+    TimeOptions time;
+    RenderOptions render;
+    SamplingOptions sampling;
+    SpatialMode spatialMode = SpatialMode::HorizontalIrradiance;
+};
+
+struct RaySample
+{
+    CCVector3d direction;
+    double irradianceWm2 = 0.0;
+    double weightHours = 1.0;
+};
+}
 
 class SOLIS
 {
 public:
-	//! Simulates global illumination on a cloud (or a mesh) with OpenGL - shortcut version
-	/** Computes per-vertex illumination intensity as a scalar field.
-		\param numberOfRays (approxiamate) number of rays to generate
-		\param vertices vertices (eventually corresponding to a mesh - see below) to englight
-		\param mesh optional mesh structure associated to the vertices
-		\param meshIsClosed if a mesh is passed as argument (see above), specifies if the mesh surface is closed (enables optimization)
-		\param width width  of the OpenGL context used to simulate illumination
-		\param height height of the OpenGL context used to simulate illumination
-		\param progressCb optional progress bar (optional)
-		\param entityName entity name (optional)
-		\return number of 'light' directions actually used (or a value <0 if an error occurred)
-	**/
-	static int Launch(	unsigned numberOfRays,
-						CCCoreLib::GenericCloud* vertices,
-						CCCoreLib::GenericMesh* mesh = nullptr,
-						bool meshIsClosed = false,
-						unsigned width = 1024,
-						unsigned height = 1024,
-						CCCoreLib::GenericProgressCallback* progressCb = nullptr,
-						const QString& entityName = QString());
+    static bool ValidateOptions(const solis::CalculationOptions& options, QString* errorMessage = nullptr);
+    static bool GenerateDirectSamples(const solis::CalculationOptions& options,
+                                      std::vector<solis::RaySample>& samples);
+    static bool GenerateDiffuseRays(unsigned count, std::vector<CCVector3d>& rays);
+    static double AggregateDiffuseIrradiance(const solis::CalculationOptions& options);
 
+    static bool LaunchDirect(const std::vector<solis::RaySample>& samples,
+                             const solis::CalculationOptions& options,
+                             CCCoreLib::GenericCloud* vertices,
+                             CCCoreLib::GenericMesh* mesh = nullptr,
+                             const std::vector<CCVector3d>* normals = nullptr,
+                             CCCoreLib::GenericProgressCallback* progressCb = nullptr,
+                             const QString& entityName = QString(),
+                             SOLISAccumulationBackend* backend = nullptr);
 
-	//! Simulates global illumination on a cloud (or a mesh) with OpenGL
-	/** Computes per-vertex illumination intensity as a scalar field.
-		\param rays light directions that will be used to compute global illumination
-		\param vertices vertices (eventually corresponding to a mesh - see below) to englight
-		\param mesh optional mesh structure associated to the vertices
-		\param meshIsClosed if a mesh is passed as argument (see above), specifies if the mesh surface is closed (enables optimization)
-		\param width width  of the OpenGL context used to simulate illumination
-		\param height height of the OpenGL context used to simulate illumination
-		\param progressCb optional progress bar (optional)
-		\param entityName entity name (optional)
-		\return success
-	**/
-	static bool Launch(	const std::vector<CCVector3>& rays,
-						const std::vector<double>& irradiance,
-						bool modeDirect,
-						double timestep,
-						CCCoreLib::GenericCloud* vertices,
-						CCCoreLib::GenericMesh* mesh = nullptr,
-						bool meshIsClosed = false,
-						unsigned width = 1024,
-						unsigned height = 1024,
-						CCCoreLib::GenericProgressCallback* progressCb = nullptr,
-						const QString& entityName = QString());
+    static bool LaunchDiffuse(const std::vector<CCVector3d>& rays,
+                              double diffuseIrradiance,
+                              const solis::CalculationOptions& options,
+                              CCCoreLib::GenericCloud* vertices,
+                              CCCoreLib::GenericMesh* mesh = nullptr,
+                              const std::vector<CCVector3d>* normals = nullptr,
+                              CCCoreLib::GenericProgressCallback* progressCb = nullptr,
+                              const QString& entityName = QString(),
+                              SOLISAccumulationBackend* backend = nullptr);
 
-	//! Generates a given number of rays
-	/*static bool GenerateRays(	unsigned numberOfRays,
-								std::vector<CCVector3>& rays);
-	*/							
-	static double SOLIS::totalDiffIrradiance (double doyFrom,double doyTo,double timestep,double lat,double lon,double elevation);
-	static bool SOLIS::GenerateSunRays( double doyFrom,double doyTo,double timestep,double lat,double lon,double elevation, std::vector<CCVector3>& rays, std::vector<double>& irradiance);
-	static bool SOLIS::GenerateDiffRays(unsigned numberOfRays, std::vector<CCVector3>& rays);
+    static QString OutputUnit(const solis::CalculationOptions& options);
+
+private:
+    static double energyUnitScale(solis::EnergyUnit unit);
 };
-
-#endif

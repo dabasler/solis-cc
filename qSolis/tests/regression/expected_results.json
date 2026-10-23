@@ -1,0 +1,69 @@
+{
+  "format_version": 1,
+  "note": "Frozen analytic expectations for the current qSOLIS NOAA + Ineichen/Perez implementation. Raster shadow tests use tolerances.",
+  "surface_orientation_test": {
+    "input": "surface_orientation_normals.ply",
+    "cli": {
+      "component": "DIRECT",
+      "output_mode": "INSTANT",
+      "spatial_mode": "SURFACE",
+      "doy": 355,
+      "time": "12:00",
+      "latitude_deg": 45.0,
+      "longitude_deg": 0.0,
+      "elevation_m": 0.0,
+      "linke_turbidity": 3.0,
+      "resolution": 1024
+    },
+    "solar": {
+      "altitude_deg": 21.57831667949104,
+      "azimuth_deg_from_north": 180.53545445059262,
+      "surface_to_sun": [
+        -0.0086903481363036,
+        -0.9298751264503162,
+        0.3677726567572394
+      ],
+      "dni_w_m2": 715.6084543354136,
+      "ghi_w_m2": 328.30412763028,
+      "dhi_w_m2": 65.12290518140333
+    },
+    "expected_group_w_m2": {
+      "HORIZONTAL": 263.1812224488767,
+      "SOUTH": 665.426501964058,
+      "NORTH": 0.0,
+      "TILT45_SOUTH": 656.624818994595
+    },
+    "relative_tolerance": 0.03
+  },
+  "wall_test": {
+    "input": "wall_regression.ply",
+    "cli": {
+      "component": "DIRECT",
+      "output_mode": "INSTANT",
+      "spatial_mode": "HORIZONTAL",
+      "doy": 172,
+      "time": "12:00",
+      "latitude_deg": 45.0,
+      "longitude_deg": 0.0,
+      "elevation_m": 0.0,
+      "linke_turbidity": 3.0,
+      "resolution": 1024
+    },
+    "solar": {
+      "altitude_deg": 68.45034663984283,
+      "azimuth_deg_from_north": 179.17061872676902,
+      "surface_to_sun": [
+        0.005316748370394699,
+        -0.36726892067297456,
+        0.9300996033191683
+      ],
+      "dni_w_m2": 897.3310781775327,
+      "ghi_w_m2": 938.2518403839456,
+      "dhi_w_m2": 103.6445605250608
+    },
+    "expected_sunlit_horizontal_w_m2": 834.6072798588848,
+    "expected_shadow_length_m": 1.9745595049935494,
+    "sunlit_relative_tolerance": 0.03,
+    "max_shadow_fraction_of_sunlit": 0.15
+  }
+}

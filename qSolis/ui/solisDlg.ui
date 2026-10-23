@@ -3,546 +3,176 @@
  <class>SOLISDialog</class>
  <widget class="QDialog" name="SOLISDialog">
   <property name="geometry">
-   <rect>
-    <x>0</x>
-    <y>0</y>
-    <width>428</width>
-    <height>362</height>
-   </rect>
+   <rect><x>0</x><y>0</y><width>620</width><height>650</height></rect>
   </property>
-  <property name="windowTitle">
-   <string>Solis v.0.9</string>
-  </property>
+  <property name="windowTitle"><string>SOLIS</string></property>
   <property name="windowIcon">
-   <iconset resource="../qSOLIS.qrc">
-    <normaloff>:/CC/plugin/qSOLIS/images/SOLISIcon.png</normaloff>:/CC/plugin/qSOLIS/images/SOLISIcon.png</iconset>
+   <iconset resource="../qSolis.qrc">
+    <normaloff>:/CC/plugin/qSolis/images/SOLISIcon.png</normaloff>:/CC/plugin/qSolis/images/SOLISIcon.png</iconset>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout_3">
+  <layout class="QVBoxLayout" name="mainLayout">
    <item>
-    <widget class="QGroupBox" name="groupBox">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="title">
-      <string>Light rays</string>
-     </property>
-     <layout class="QVBoxLayout" name="verticalLayout_2">
+    <widget class="QGroupBox" name="siteGroupBox">
+     <property name="title"><string>Location &amp; time</string></property>
+     <layout class="QGridLayout" name="siteGridLayout">
+      <item row="0" column="0"><widget class="QLabel" name="latitudeLabel"><property name="text"><string>Latitude</string></property></widget></item>
+      <item row="0" column="1">
+       <widget class="QDoubleSpinBox" name="latDoubleSpinBox">
+        <property name="decimals"><number>5</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property><property name="value"><double>45.0</double></property><property name="suffix"><string>°</string></property>
+       </widget>
+      </item>
+      <item row="0" column="2"><widget class="QLabel" name="longitudeLabel"><property name="text"><string>Longitude</string></property></widget></item>
+      <item row="0" column="3">
+       <widget class="QDoubleSpinBox" name="lonDoubleSpinBox">
+        <property name="decimals"><number>5</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property><property name="value"><double>10.0</double></property><property name="suffix"><string>°</string></property><property name="toolTip"><string>East-positive longitude; west is negative.</string></property>
+       </widget>
+      </item>
+      <item row="0" column="4"><widget class="QLabel" name="elevationLabel"><property name="text"><string>Elevation</string></property></widget></item>
+      <item row="0" column="5">
+       <widget class="QSpinBox" name="elevationSpinBox"><property name="minimum"><number>-500</number></property><property name="maximum"><number>10000</number></property><property name="singleStep"><number>10</number></property><property name="suffix"><string> m</string></property></widget>
+      </item>
+      <item row="1" column="0"><widget class="QLabel" name="doyLabel"><property name="text"><string>DOY</string></property></widget></item>
+      <item row="1" column="1"><widget class="QSpinBox" name="doySpinBox"><property name="minimum"><number>1</number></property><property name="maximum"><number>366</number></property><property name="value"><number>172</number></property></widget></item>
+      <item row="1" column="2"><widget class="QLabel" name="clockLabel"><property name="text"><string>Time</string></property></widget></item>
+      <item row="1" column="3"><widget class="QTimeEdit" name="timeEdit"><property name="displayFormat"><string notr="true">HH:mm</string></property><property name="time"><time><hour>12</hour><minute>0</minute><second>0</second></time></property></widget></item>
+      <item row="1" column="4"><widget class="QComboBox" name="timeModeComboBox">
+       <item><property name="text"><string>UTC</string></property></item>
+       <item><property name="text"><string>Local fixed offset</string></property></item>
+      </widget></item>
+      <item row="1" column="5"><widget class="QDoubleSpinBox" name="utcOffsetDoubleSpinBox"><property name="minimum"><double>-14.0</double></property><property name="maximum"><double>14.0</double></property><property name="singleStep"><double>0.5</double></property><property name="decimals"><number>2</number></property><property name="prefix"><string>UTC </string></property><property name="suffix"><string> h</string></property><property name="toolTip"><string>Fixed civil-time offset from UTC. Include daylight-saving time when applicable.</string></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="calculationGroupBox">
+     <property name="title"><string>Calculation</string></property>
+     <layout class="QGridLayout" name="calculationGridLayout">
+      <item row="0" column="0"><widget class="QLabel" name="outputModeLabel"><property name="text"><string>Output</string></property></widget></item>
+      <item row="0" column="1" colspan="2"><widget class="QComboBox" name="temporalModeComboBox">
+       <item><property name="text"><string>Instantaneous irradiance</string></property></item>
+       <item><property name="text"><string>Mean irradiance over interval</string></property></item>
+       <item><property name="text"><string>Integrated irradiation / energy</string></property></item>
+      </widget></item>
+      <item row="0" column="3"><widget class="QLabel" name="unitLabel"><property name="text"><string>Units</string></property></widget></item>
+      <item row="0" column="4"><widget class="QComboBox" name="energyUnitComboBox">
+       <item><property name="text"><string>Wh/m²</string></property></item>
+       <item><property name="text"><string>kWh/m²</string></property></item>
+      </widget></item>
+      <item row="0" column="5"><widget class="QLabel" name="effectiveUnitLabel"><property name="text"><string>W/m²</string></property><property name="toolTip"><string>Effective output unit for the selected mode.</string></property></widget></item>
+
+      <item row="1" column="0"><widget class="QLabel" name="durationLabel"><property name="text"><string>Duration</string></property></widget></item>
+      <item row="1" column="1"><widget class="QDoubleSpinBox" name="integrationDoubleSpinBox"><property name="minimum"><double>0.01</double></property><property name="maximum"><double>8760.0</double></property><property name="decimals"><number>3</number></property><property name="value"><double>24.0</double></property><property name="suffix"><string> h</string></property></widget></item>
+      <item row="1" column="2"><widget class="QLabel" name="timestepLabel"><property name="text"><string>Timestep</string></property></widget></item>
+      <item row="1" column="3"><widget class="QDoubleSpinBox" name="timestepDoubleSpinBox"><property name="minimum"><double>0.01</double></property><property name="maximum"><double>10080.0</double></property><property name="decimals"><number>3</number></property><property name="value"><double>5.0</double></property><property name="suffix"><string> min</string></property></widget></item>
+
+      <item row="2" column="0"><widget class="QLabel" name="spatialModeLabel"><property name="text"><string>Spatial mode</string></property></widget></item>
+      <item row="2" column="1" colspan="3"><widget class="QComboBox" name="spatialModeComboBox">
+       <item><property name="text"><string>Horizontal-reference irradiance</string></property></item>
+       <item><property name="text"><string>True surface irradiance (uses normals)</string></property></item>
+       <item><property name="text"><string>Visibility fraction</string></property></item>
+      </widget></item>
+      <item row="2" column="4" colspan="2"><widget class="QLabel" name="surfaceWarningLabel"><property name="text"><string>Surface mode requires normals on every selected entity.</string></property><property name="wordWrap"><bool>true</bool></property><property name="visible"><bool>false</bool></property></widget></item>
+
+      <item row="3" column="0"><widget class="QLabel" name="componentsLabel"><property name="text"><string>Components</string></property></widget></item>
+      <item row="3" column="1"><widget class="QCheckBox" name="calcDirectCheckBox"><property name="text"><string>Direct</string></property><property name="checked"><bool>true</bool></property></widget></item>
+      <item row="3" column="2"><widget class="QCheckBox" name="calcDiffCheckBox"><property name="text"><string>Diffuse</string></property></widget></item>
+      <item row="3" column="3" colspan="3"><widget class="QLabel" name="componentHintLabel"><property name="text"><string>Direct + Diffuse also creates Total (except in Visibility mode).</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="batchGroupBox">
+     <property name="title"><string>Batch time series</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>false</bool></property>
+     <property name="toolTip"><string>Generate the configured calculation at multiple start times. For integrated/mean modes, each time point starts its own interval.</string></property>
+     <layout class="QHBoxLayout" name="batchHorizontalLayout">
+      <item><widget class="QLabel" name="batchEndLabel"><property name="text"><string>End DOY</string></property></widget></item>
+      <item><widget class="QSpinBox" name="batchEndDoySpinBox"><property name="minimum"><number>1</number></property><property name="maximum"><number>366</number></property><property name="value"><number>172</number></property></widget></item>
+      <item><widget class="QTimeEdit" name="batchEndTimeEdit"><property name="displayFormat"><string notr="true">HH:mm</string></property><property name="time"><time><hour>18</hour><minute>0</minute><second>0</second></time></property></widget></item>
+      <item><widget class="QLabel" name="batchStepLabel"><property name="text"><string>Step</string></property></widget></item>
+      <item><widget class="QDoubleSpinBox" name="batchStepMinutesSpinBox"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.01</double></property><property name="maximum"><double>10080.0</double></property><property name="value"><double>60.0</double></property><property name="suffix"><string> min</string></property></widget></item>
+      <item><widget class="QLabel" name="batchCountLabel"><property name="text"><string>1 time point</string></property></widget></item>
+      <item><spacer name="batchSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>30</width><height>20</height></size></property></spacer></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="qualityGroupBox">
+     <property name="title"><string>Quality</string></property>
+     <layout class="QHBoxLayout" name="qualityLayout">
+      <item><widget class="QLabel" name="qualityLabel"><property name="text"><string>Preset</string></property></widget></item>
+      <item><widget class="QComboBox" name="qualityPresetComboBox">
+       <item><property name="text"><string>Fast</string></property></item>
+       <item><property name="text"><string>Normal</string></property></item>
+       <item><property name="text"><string>High</string></property></item>
+       <item><property name="text"><string>Custom</string></property></item>
+      </widget></item>
+      <item><widget class="QLabel" name="qualitySummaryLabel"><property name="text"><string>1024 px / 256 diffuse rays</string></property></widget></item>
+      <item><spacer name="qualitySpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QToolButton" name="advancedToolButton"><property name="text"><string>Advanced options</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>false</bool></property><property name="toolButtonStyle"><enum>Qt::ToolButtonTextBesideIcon</enum></property><property name="arrowType"><enum>Qt::RightArrow</enum></property></widget>
+   </item>
+   <item>
+    <widget class="QWidget" name="advancedPanel" native="true">
+     <property name="visible"><bool>false</bool></property>
+     <layout class="QVBoxLayout" name="advancedLayout">
+      <property name="leftMargin"><number>0</number></property><property name="topMargin"><number>0</number></property><property name="rightMargin"><number>0</number></property><property name="bottomMargin"><number>0</number></property>
       <item>
-       <widget class="QFrame" name="locationFrame">
-        <property name="enabled">
-         <bool>true</bool>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_2">
-         <item>
-          <widget class="QLabel" name="label_5">
-           <property name="text">
-            <string>Latitude</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QDoubleSpinBox" name="latDoubleSpinBox">
-           <property name="minimumSize">
-            <size>
-             <width>55</width>
-             <height>0</height>
-            </size>
-           </property>
-           <property name="decimals">
-            <number>3</number>
-           </property>
-           <property name="maximum">
-            <double>90.000000000000000</double>
-           </property>
-           <property name="value">
-            <double>45.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_6">
-           <property name="text">
-            <string>  N</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer_4">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_7">
-           <property name="text">
-            <string>Longitude</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QDoubleSpinBox" name="lonDoubleSpinBox">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>55</width>
-             <height>0</height>
-            </size>
-           </property>
-           <property name="decimals">
-            <number>3</number>
-           </property>
-           <property name="minimum">
-            <double>-180.000000000000000</double>
-           </property>
-           <property name="maximum">
-            <double>180.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_8">
-           <property name="text">
-            <string>  E</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_11">
-           <property name="text">
-            <string>Elevation</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QSpinBox" name="elevationSpinBox">
-           <property name="minimum">
-            <number>-420</number>
-           </property>
-           <property name="maximum">
-            <number>9000</number>
-           </property>
-           <property name="singleStep">
-            <number>10</number>
-           </property>
-           <property name="value">
-            <number>0</number>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_12">
-           <property name="text">
-            <string>m</string>
-           </property>
-          </widget>
-         </item>
+       <widget class="QGroupBox" name="atmosphereGroupBox"><property name="title"><string>Atmosphere</string></property>
+        <layout class="QHBoxLayout" name="atmosphereLayout">
+         <item><widget class="QLabel" name="linkeLabel"><property name="text"><string>Linke turbidity</string></property></widget></item>
+         <item><widget class="QDoubleSpinBox" name="linkeTurbidityDoubleSpinBox"><property name="minimum"><double>1.0</double></property><property name="maximum"><double>12.0</double></property><property name="decimals"><number>2</number></property><property name="singleStep"><double>0.1</double></property><property name="value"><double>3.0</double></property></widget></item>
+         <item><widget class="QLabel" name="linkeHintLabel"><property name="text"><string>Clear-sky atmospheric turbidity (typically ~2–5).</string></property></widget></item>
+         <item><spacer name="atmosphereSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
         </layout>
        </widget>
       </item>
       <item>
-       <widget class="QFrame" name="timeFrame">
-        <layout class="QHBoxLayout" name="horizontalLayout_4">
-         <item>
-          <widget class="QLabel" name="label_3">
-           <property name="text">
-            <string>DOY</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QSpinBox" name="doySpinBox">
-           <property name="baseSize">
-            <size>
-             <width>0</width>
-             <height>0</height>
-            </size>
-           </property>
-           <property name="minimum">
-            <number>1</number>
-           </property>
-           <property name="maximum">
-            <number>365</number>
-           </property>
-           <property name="value">
-            <number>172</number>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QTimeEdit" name="timeEdit">
-           <property name="dateTime">
-            <datetime>
-             <hour>0</hour>
-             <minute>0</minute>
-             <second>0</second>
-             <year>1999</year>
-             <month>12</month>
-             <day>31</day>
-            </datetime>
-           </property>
-           <property name="displayFormat">
-            <string notr="true">HH:mm</string>
-           </property>
-           <property name="timeSpec">
-            <enum>Qt::UTC</enum>
-           </property>
-           <property name="time">
-            <time>
-             <hour>0</hour>
-             <minute>0</minute>
-             <second>0</second>
-            </time>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
+       <widget class="QGroupBox" name="renderingGroupBox"><property name="title"><string>Rendering &amp; CPU</string></property>
+        <layout class="QGridLayout" name="renderingGridLayout">
+         <item row="0" column="0"><widget class="QLabel" name="resolutionLabel"><property name="text"><string>Resolution</string></property></widget></item>
+         <item row="0" column="1"><widget class="QSpinBox" name="resSpinBox"><property name="minimum"><number>128</number></property><property name="maximum"><number>16384</number></property><property name="singleStep"><number>128</number></property><property name="value"><number>1024</number></property><property name="suffix"><string> px</string></property></widget></item>
+         <item row="0" column="2"><widget class="QLabel" name="depthBiasLabel"><property name="text"><string>Depth bias</string></property></widget></item>
+         <item row="0" column="3"><widget class="QDoubleSpinBox" name="depthBiasDoubleSpinBox"><property name="minimum"><double>0.0</double></property><property name="maximum"><double>0.05</double></property><property name="decimals"><number>6</number></property><property name="singleStep"><double>0.0001</double></property><property name="value"><double>0.001</double></property><property name="toolTip"><string>Depth-comparison tolerance used by the shadow/visibility test.</string></property></widget></item>
+         <item row="1" column="0"><widget class="QLabel" name="threadsLabel"><property name="text"><string>CPU threads</string></property></widget></item>
+         <item row="1" column="1"><widget class="QSpinBox" name="threadsSpinBox"><property name="minimum"><number>0</number></property><property name="maximum"><number>1024</number></property><property name="specialValueText"><string>Auto</string></property><property name="value"><number>0</number></property><property name="toolTip"><string>0 = automatic; 1 = single-threaded; N = requested worker count.</string></property></widget></item>
+         <item row="1" column="2" colspan="2"><widget class="QCheckBox" name="closedMeshCheckBox"><property name="text"><string>Closed mesh optimization</string></property><property name="toolTip"><string>Enable only for meshes known to be closed (no holes).</string></property></widget></item>
         </layout>
        </widget>
       </item>
       <item>
-       <widget class="QFrame" name="frame_2">
-        <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_6">
-         <item>
-          <widget class="QCheckBox" name="integrateCheckBox">
-           <property name="text">
-            <string>integrate over </string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QDoubleSpinBox" name="integrationDoubleSpinBox">
-           <property name="maximum">
-            <double>240.000000000000000</double>
-           </property>
-           <property name="value">
-            <double>24.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_13">
-           <property name="text">
-            <string>hours</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="horizontalSpacer_5">
-           <property name="orientation">
-            <enum>Qt::Horizontal</enum>
-           </property>
-           <property name="sizeHint" stdset="0">
-            <size>
-             <width>40</width>
-             <height>20</height>
-            </size>
-           </property>
-          </spacer>
-         </item>
-         <item>
-          <widget class="QLabel" name="label">
-           <property name="text">
-            <string>Timestep</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QDoubleSpinBox" name="timestepDoubleSpinBox">
-           <property name="value">
-            <double>1.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="label_4">
-           <property name="text">
-            <string>minutes</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QFrame" name="frame">
-        <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_5">
-         <item>
-          <widget class="QCheckBox" name="calcDirectCheckBox">
-           <property name="text">
-            <string>Direct Irradiance</string>
-           </property>
-           <property name="checked">
-            <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QFrame" name="DiffuseFrame">
-        <property name="enabled">
-         <bool>true</bool>
-        </property>
-        <property name="sizePolicy">
-         <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-          <horstretch>0</horstretch>
-          <verstretch>0</verstretch>
-         </sizepolicy>
-        </property>
-        <property name="frameShape">
-         <enum>QFrame::StyledPanel</enum>
-        </property>
-        <property name="frameShadow">
-         <enum>QFrame::Raised</enum>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_3">
-         <item>
-          <widget class="QCheckBox" name="calcDiffCheckBox">
-           <property name="text">
-            <string>Diffuse Irradiance</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="rayslabel">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="text">
-            <string>Number of diffuse rays</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QSpinBox" name="raysSpinBox">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="minimum">
-            <number>16</number>
-           </property>
-           <property name="maximum">
-            <number>2048</number>
-           </property>
-           <property name="singleStep">
-            <number>16</number>
-           </property>
-           <property name="value">
-            <number>256</number>
-           </property>
-          </widget>
-         </item>
+       <widget class="QGroupBox" name="samplingGroupBox"><property name="title"><string>Sampling</string></property>
+        <layout class="QGridLayout" name="samplingGridLayout">
+         <item row="0" column="0"><widget class="QLabel" name="rayslabel"><property name="text"><string>Diffuse rays</string></property></widget></item>
+         <item row="0" column="1"><widget class="QSpinBox" name="raysSpinBox"><property name="minimum"><number>1</number></property><property name="maximum"><number>65536</number></property><property name="singleStep"><number>16</number></property><property name="value"><number>256</number></property></widget></item>
+         <item row="1" column="0" colspan="2"><widget class="QCheckBox" name="directAccelerationCheckBox"><property name="text"><string>Group nearby direct-sun directions</string></property><property name="toolTip"><string>Accelerates long direct integrations by merging neighboring sun directions within an angular tolerance.</string></property></widget></item>
+         <item row="1" column="2"><widget class="QLabel" name="angularToleranceLabel"><property name="text"><string>Angular tolerance</string></property></widget></item>
+         <item row="1" column="3"><widget class="QDoubleSpinBox" name="angularToleranceDoubleSpinBox"><property name="minimum"><double>0.0</double></property><property name="maximum"><double>180.0</double></property><property name="decimals"><number>3</number></property><property name="singleStep"><double>0.05</double></property><property name="value"><double>0.1</double></property><property name="suffix"><string>°</string></property></widget></item>
         </layout>
        </widget>
       </item>
      </layout>
     </widget>
    </item>
+   <item><spacer name="verticalSpacer"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
    <item>
-    <layout class="QHBoxLayout">
-     <item>
-      <widget class="QLabel" name="label_2">
-       <property name="text">
-        <string>Render context resolution</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QSpinBox" name="resSpinBox">
-       <property name="toolTip">
-        <string>rendering buffer resolution</string>
-       </property>
-       <property name="minimum">
-        <number>128</number>
-       </property>
-       <property name="maximum">
-        <number>4096</number>
-       </property>
-       <property name="singleStep">
-        <number>128</number>
-       </property>
-       <property name="value">
-        <number>1024</number>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <spacer name="horizontalSpacer_3">
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="horizontalLayout">
-     <item>
-      <widget class="QCheckBox" name="closedMeshCheckBox">
-       <property name="toolTip">
-        <string>Accelerates computation if the mesh is closed (no holes)</string>
-       </property>
-       <property name="text">
-        <string>closed mesh</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <spacer name="verticalSpacer_2">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>40</height>
-      </size>
-     </property>
-    </spacer>
-   </item>
-   <item>
-    <spacer name="verticalSpacer">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>20</width>
-       <height>40</height>
-      </size>
-     </property>
-    </spacer>
-   </item>
-   <item>
-    <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
-     </property>
+    <widget class="QLabel" name="versionLabel">
+     <property name="text"><string>qSOLIS v1.0.0</string></property>
+     <property name="alignment"><set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set></property>
+     <property name="styleSheet"><string notr="true">color: palette(mid);</string></property>
+     <property name="toolTip"><string>qSOLIS plugin version</string></property>
     </widget>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="buttonBox"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property></widget>
    </item>
   </layout>
  </widget>
- <resources>
-  <include location="../qSOLIS.qrc"/>
- </resources>
+ <resources><include location="../qSolis.qrc"/></resources>
  <connections>
-  <connection>
-   <sender>buttonBox</sender>
-   <signal>accepted()</signal>
-   <receiver>SOLISDialog</receiver>
-   <slot>accept()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>248</x>
-     <y>254</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>157</x>
-     <y>274</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>buttonBox</sender>
-   <signal>rejected()</signal>
-   <receiver>SOLISDialog</receiver>
-   <slot>reject()</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>316</x>
-     <y>260</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>286</x>
-     <y>274</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>calcDiffCheckBox</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>rayslabel</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>205</x>
-     <y>151</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>276</x>
-     <y>182</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>calcDiffCheckBox</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>raysSpinBox</receiver>
-   <slot>setEnabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>83</x>
-     <y>182</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>360</x>
-     <y>182</y>
-    </hint>
-   </hints>
-  </connection>
+  <connection><sender>buttonBox</sender><signal>accepted()</signal><receiver>SOLISDialog</receiver><slot>accept()</slot><hints/></connection>
+  <connection><sender>buttonBox</sender><signal>rejected()</signal><receiver>SOLISDialog</receiver><slot>reject()</slot><hints/></connection>
  </connections>
 </ui>

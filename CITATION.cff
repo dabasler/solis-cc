@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use qSOLIS in research, please cite the software release and describe the calculation settings."
+title: "qSOLIS: Solar visibility, irradiance, and irradiation analysis for CloudCompare"
+type: software
+version: "1.0.0"
+date-released: "2026-10-15"
+authors:
+  - family-names: "Basler"
+    given-names: "David"
+license: "GPL-2.0-or-later"
