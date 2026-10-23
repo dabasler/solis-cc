@@ -81,11 +81,17 @@ def main():
         print(f"wall Sun Exposure shadow median={near_median:.4f} "
               f"sunlit median={far_median:.4f} {'PASS' if ok else 'FAIL'}")
     elif args.mode == "wall-sky":
-        # A 5 m wall should remove a substantial angular sector from the near-wall
-        # upper hemisphere while the far control is nearly open.
-        ok = far_median >= 0.90 and near_median <= far_median - 0.05
+        # Both samples still see the finite wall, so the farther control is not
+        # expected to be an open-sky value of 1.0.  The regression requirement
+        # is geometric: moving away from the wall must restore a substantial
+        # fraction of the visible upper hemisphere.  Keep broad thresholds so
+        # small cross-platform rasterization differences do not cause failures.
+        delta = far_median - near_median
+        ok = (far_median >= 0.70
+              and near_median <= 0.70
+              and delta >= 0.15)
         print(f"wall Sky Exposure near={near_median:.4f} far={far_median:.4f} "
-              f"{'PASS' if ok else 'FAIL'}")
+              f"delta={delta:.4f} {'PASS' if ok else 'FAIL'}")
     else:
         # At summer noon the north-side shadow loses the direct term, but retains
         # part of the diffuse sky term; far-open ground should remain near 1.
