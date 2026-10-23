@@ -59,3 +59,23 @@ The preset controls only resolution and diffuse-ray count. It does not silently 
 ## Surface-normal handling
 
 When Surface mode is selected, qSOLIS copies and normalizes the existing CloudCompare point/vertex normals into the calculation buffer and passes them to both Direct and Diffuse accumulation. No normals are generated automatically. Missing normals result in an explicit error rather than a horizontal fallback.
+
+
+## SOLIS Exposure...
+
+qSOLIS v1.1.0 adds a dedicated exposure dialog with Sky, Sun, Radiative, and Crown Exposure metrics. Temporal/site controls are disabled for Sky-only calculations. Crown summary forces Radiative Exposure because CEI is defined as the spatially weighted mean REI. Duration zero selects instantaneous exposure.
+
+### Occlusion context
+
+The exposure dialog separates result targets from blocker geometry:
+
+- **Target only** — self-exposure only.
+- **Selected entities** — default; all selected targets mutually occlude and each receives results.
+- **All visible entities** — selected entities receive results, while all visible point clouds/meshes in the DB tree can block rays. This supports one-tree-at-a-time analysis with neighboring trees or terrain left visible as context.
+
+## SOLIS Export Crown Exposure Summary...
+
+Select one or more point-cloud/mesh tree entities that already contain Crown Exposure metadata, then choose **SOLIS Export Crown Exposure Summary...**. qSOLIS writes one CSV row per selected entity using that entity's most recently stored crown-exposure run. Entities without a stored crown summary are skipped and reported in the console.
+
+The export contains CEI, optional Sky/Sun means, REI mean and P10/P50/P90, threshold/exposed fraction, crown weighting and voxel/mesh statistics, occlusion-context provenance, site/time settings, run ID, schema version, and plugin version.
+

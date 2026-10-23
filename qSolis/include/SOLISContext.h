@@ -20,6 +20,8 @@ public:
     SOLISContext();
     ~SOLISContext() override;
 
+    bool setOcclusionContext(const std::vector<SOLISOccluder>& occluders) override;
+
     bool init(unsigned W,
               unsigned H,
               CCCoreLib::GenericCloud* cloud,
@@ -28,6 +30,9 @@ public:
               double depthBias,
               bool parallelCpuProjection,
               unsigned cpuThreadCount) override;
+
+    int visibility(std::vector<uint8_t>& visible,
+                   const CCVector3d& lightTravelDirection) override;
 
     int accumulate(std::vector<double>& accumulator,
                    const CCVector3d& lightTravelDirection,
@@ -38,19 +43,17 @@ public:
 private:
     void associateToEntity(CCCoreLib::GenericCloud* cloud, CCCoreLib::GenericMesh* mesh);
     bool buildGeometryCache();
+    bool buildContextGeometryCache();
+    void computeContextBoundingBox();
     bool glInit();
     bool makeCurrent();
     bool uploadGeometry();
     bool drawEntity();
-    bool projectVisible(unsigned pointIndex,
-                        const double* viewMatrix,
-                        const double* projectionMatrix,
-                        const int* viewport,
-                        const CCVector3d& surfaceToSource,
-                        solis::SpatialMode spatialMode,
-                        const std::vector<CCVector3d>* normals,
-                        double scalarWeight,
-                        double& contribution) const;
+    bool drawContext();
+    bool projectDepthVisible(unsigned pointIndex,
+                             const double* viewMatrix,
+                             const double* projectionMatrix,
+                             const int* viewport) const;
 
     CCCoreLib::GenericCloud* m_vertices = nullptr;
     CCCoreLib::GenericMesh* m_mesh = nullptr;
@@ -73,9 +76,20 @@ private:
 
     std::vector<float> m_snapZ;
     std::vector<uint8_t> m_snapC;
+    std::vector<uint8_t> m_visibilityScratch;
     std::vector<CCVector3d> m_points;
     std::vector<PointCoordinateType> m_drawVertices;
     std::vector<unsigned> m_indices;
     bool m_useIndexBuffer = false;
     unsigned m_drawVertexCount = 0;
+
+    struct ContextDrawBatch
+    {
+        bool triangles = false;
+        unsigned firstVertex = 0;
+        unsigned vertexCount = 0;
+    };
+    std::vector<SOLISOccluder> m_occlusionContext;
+    std::vector<ContextDrawBatch> m_contextDrawBatches;
+    bool m_contextRendering = false;
 };

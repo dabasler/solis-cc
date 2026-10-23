@@ -1,9 +1,15 @@
 #include "qSOLIS.h"
 #include "ccSolisDlg.h"
+#include "ccSolisExposureDlg.h"
 #include "SOLIS.h"
 #include "SOLISBatch.h"
 #include "SOLISCommand.h"
 #include "SOLISCleanupCommand.h"
+#include "SOLISExposureCommand.h"
+#include "SOLISExposure.h"
+#include "SOLISCrownExposure.h"
+#include "SOLISCrownExport.h"
+#include "SOLISCrownExportCommand.h"
 #include "SOLISCleanupDlg.h"
 #include "SOLISBackend.h"
 #include "SOLISResults.h"
@@ -16,6 +22,8 @@
 #include <ccScalarField.h>
 
 #include <QAction>
+#include <QDir>
+#include <QFileDialog>
 #include <QMainWindow>
 #include <QMap>
 #include <QMessageBox>
@@ -25,6 +33,7 @@
 #include <cmath>
 #include <memory>
 #include <new>
+#include <utility>
 #include <vector>
 
 namespace
@@ -73,6 +82,54 @@ bool s_calculateDirect = true;
 bool s_calculateDiffuse = false;
 bool s_advancedVisible = false;
 int s_qualityPreset = 1; // Normal
+
+solis::ExposureOptions defaultExposureOptions()
+{
+    solis::ExposureOptions options;
+    options.metrics = solis::ExposureAll;
+    options.crownSummary = true;
+    options.crownVoxelAuto = true;
+    options.crownVoxelSize = 0.2;
+    options.crownThreshold = 0.75;
+    options.calculation = defaultGuiOptions();
+    options.calculation.time.dayOfYear = 172.0;
+    options.calculation.time.mode = solis::TemporalMode::IntegratedEnergy;
+    options.calculation.time.durationHours = 24.0;
+    options.calculation.time.timestepMinutes = 10.0;
+    options.calculation.time.energyUnit = solis::EnergyUnit::WhPerM2;
+    options.calculation.spatialMode = solis::SpatialMode::HorizontalIrradiance;
+    return options;
+}
+
+solis::ExposureOptions s_exposureOptions = defaultExposureOptions();
+bool s_exposureAdvancedVisible = false;
+int s_exposureQualityPreset = 1;
+
+bool writeExposureField(ccPointCloud* cloud,
+                        const QString& baseName,
+                        const std::vector<double>& values,
+                        solis::ResultField& field)
+{
+    if (!cloud || values.size() != cloud->size()
+        || !solis::ResultManager::CreateNamedResultField(cloud, baseName, field))
+        return false;
+    auto sf = cloud->getScalarField(field.index);
+    if (!sf)
+    {
+        cloud->deleteScalarField(field.index);
+        field = solis::ResultField{};
+        return false;
+    }
+    for (unsigned i = 0; i < cloud->size(); ++i)
+        sf->setValue(i, static_cast<ScalarType>(values[i]));
+    solis::ResultManager::FinalizeField(cloud, field.index);
+    return true;
+}
+
+QString optionalFraction(double value)
+{
+    return std::isfinite(value) ? QString::number(value, 'f', 4) : QStringLiteral("n/a");
+}
 
 constexpr unsigned BatchConfirmationThreshold = 100;
 
@@ -123,6 +180,128 @@ bool extractNormals(ccPointCloud* cloud, std::vector<CCVector3d>& normals)
     return true;
 }
 
+struct ExposureEntity
+{
+    ccHObject* entity = nullptr;
+    ccPointCloud* cloud = nullptr;
+    ccGenericMesh* mesh = nullptr;
+};
+
+std::vector<ExposureEntity> selectedExposureTargets(const ccHObject::Container& selection)
+{
+    std::vector<ExposureEntity> targets;
+    QSet<ccPointCloud*> seenClouds;
+
+    // Prefer a selected mesh over its associated vertex cloud when both are selected.
+    for (ccHObject* obj : selection)
+    {
+        if (!obj || !obj->isKindOf(CC_TYPES::MESH))
+            continue;
+        ccGenericMesh* mesh = nullptr;
+        ccPointCloud* cloud = pointCloudForObject(obj, &mesh);
+        if (cloud && mesh && !seenClouds.contains(cloud))
+        {
+            seenClouds.insert(cloud);
+            targets.push_back({obj, cloud, mesh});
+        }
+    }
+    for (ccHObject* obj : selection)
+    {
+        if (!obj || !obj->isA(CC_TYPES::POINT_CLOUD))
+            continue;
+        ccPointCloud* cloud = pointCloudForObject(obj);
+        if (cloud && !seenClouds.contains(cloud))
+        {
+            seenClouds.insert(cloud);
+            targets.push_back({obj, cloud, nullptr});
+        }
+    }
+    return targets;
+}
+
+std::vector<ExposureEntity> visibleExposureGeometry(ccHObject* root)
+{
+    std::vector<ExposureEntity> geometry;
+    if (!root)
+        return geometry;
+
+    QSet<ccPointCloud*> meshClouds;
+    ccHObject::Container meshes;
+    root->filterChildren(meshes, true, CC_TYPES::MESH);
+    for (ccHObject* obj : meshes)
+    {
+        if (!obj || !obj->isDisplayed())
+            continue;
+        ccGenericMesh* mesh = nullptr;
+        ccPointCloud* cloud = pointCloudForObject(obj, &mesh);
+        if (cloud && mesh)
+        {
+            geometry.push_back({obj, cloud, mesh});
+            meshClouds.insert(cloud);
+        }
+    }
+
+    ccHObject::Container clouds;
+    root->filterChildren(clouds, true, CC_TYPES::POINT_CLOUD, true);
+    for (ccHObject* obj : clouds)
+    {
+        if (!obj || !obj->isDisplayed())
+            continue;
+        ccPointCloud* cloud = pointCloudForObject(obj);
+        if (cloud && !meshClouds.contains(cloud))
+            geometry.push_back({obj, cloud, nullptr});
+    }
+    return geometry;
+}
+
+void appendUniqueOccluder(std::vector<SOLISOccluder>& occluders,
+                          QStringList& names,
+                          const ExposureEntity& source)
+{
+    if (!source.cloud)
+        return;
+    const auto existing = std::find_if(occluders.begin(), occluders.end(),
+                                       [&](const SOLISOccluder& item)
+                                       {
+                                           return item.cloud == source.cloud && item.mesh == source.mesh;
+                                       });
+    if (existing != occluders.end())
+        return;
+
+    occluders.push_back({source.cloud, source.mesh});
+    const QString name = source.entity ? source.entity->getName() : QStringLiteral("unnamed");
+    const unsigned uniqueId = source.entity ? source.entity->getUniqueID() : 0u;
+    names.push_back(QStringLiteral("%1 [id=%2]").arg(name).arg(uniqueId));
+}
+
+void buildExposureContext(const ExposureEntity& target,
+                          const std::vector<ExposureEntity>& selectedTargets,
+                          const std::vector<ExposureEntity>& visibleGeometry,
+                          solis::ExposureOcclusionContext mode,
+                          std::vector<SOLISOccluder>& occluders,
+                          solis::ExposureContextInfo& info)
+{
+    occluders.clear();
+    info = solis::ExposureContextInfo{};
+    info.mode = mode;
+
+    if (mode == solis::ExposureOcclusionContext::TargetOnly)
+    {
+        appendUniqueOccluder(occluders, info.entityNames, target);
+        return;
+    }
+
+    const auto& sources = mode == solis::ExposureOcclusionContext::AllVisibleEntities
+                        ? visibleGeometry
+                        : selectedTargets;
+    for (const ExposureEntity& source : sources)
+        appendUniqueOccluder(occluders, info.entityNames, source);
+
+    // The selected target always participates in self-occlusion even if hidden or
+    // otherwise absent from the selected/visible context set.
+    appendUniqueOccluder(occluders, info.entityNames, target);
+}
+
 } // namespace
 
 qSOLIS::qSOLIS(QObject* parent)
@@ -134,16 +313,24 @@ qSOLIS::qSOLIS(QObject* parent)
 void qSOLIS::onNewSelection(const ccHObject::Container& selectedEntities)
 {
     bool eligible = false;
+    bool hasCrownSummary = false;
     for (ccHObject* obj : selectedEntities)
     {
-        if (obj && (obj->isKindOf(CC_TYPES::POINT_CLOUD) || obj->isKindOf(CC_TYPES::MESH)))
-        {
-            eligible = true;
-            break;
-        }
+        if (!obj || !(obj->isKindOf(CC_TYPES::POINT_CLOUD) || obj->isKindOf(CC_TYPES::MESH)))
+            continue;
+
+        eligible = true;
+        ccPointCloud* cloud = pointCloudForObject(obj);
+        solis::CrownExposureExportRecord record;
+        if (cloud && solis::CrownExposureExport::LatestRecord(cloud, record))
+            hasCrownSummary = true;
     }
     if (m_action)
         m_action->setEnabled(eligible);
+    if (m_exposureAction)
+        m_exposureAction->setEnabled(eligible);
+    if (m_exportCrownAction)
+        m_exportCrownAction->setEnabled(hasCrownSummary);
     if (m_cleanupAction)
         m_cleanupAction->setEnabled(eligible);
 }
@@ -157,6 +344,20 @@ QList<QAction*> qSOLIS::getActions()
         m_action->setIcon(getIcon());
         connect(m_action, &QAction::triggered, this, &qSOLIS::doAction);
     }
+    if (!m_exposureAction)
+    {
+        m_exposureAction = new QAction(tr("SOLIS Exposure..."), this);
+        m_exposureAction->setToolTip(tr("Calculate canopy sky, sun, radiative, and crown exposure metrics"));
+        m_exposureAction->setIcon(getIcon());
+        connect(m_exposureAction, &QAction::triggered, this, &qSOLIS::doExposureAction);
+    }
+    if (!m_exportCrownAction)
+    {
+        m_exportCrownAction = new QAction(tr("SOLIS Export Crown Exposure Summary..."), this);
+        m_exportCrownAction->setToolTip(tr("Export the latest stored Crown Exposure summary for each selected tree/entity to CSV"));
+        m_exportCrownAction->setIcon(getIcon());
+        connect(m_exportCrownAction, &QAction::triggered, this, &qSOLIS::doExportCrownAction);
+    }
     if (!m_cleanupAction)
     {
         m_cleanupAction = new QAction(tr("SOLIS Cleanup..."), this);
@@ -164,7 +365,9 @@ QList<QAction*> qSOLIS::getActions()
         m_cleanupAction->setIcon(getIcon());
         connect(m_cleanupAction, &QAction::triggered, this, &qSOLIS::doCleanupAction);
     }
-    return {m_action, m_cleanupAction};
+    if (m_app)
+        onNewSelection(m_app->getSelectedEntities());
+    return {m_action, m_exposureAction, m_exportCrownAction, m_cleanupAction};
 }
 
 void qSOLIS::doAction()
@@ -448,6 +651,253 @@ void qSOLIS::doAction()
     m_app->refreshAll();
 }
 
+void qSOLIS::doExposureAction()
+{
+    if (!m_app)
+        return;
+
+    const std::vector<ExposureEntity> targets = selectedExposureTargets(m_app->getSelectedEntities());
+    if (targets.empty())
+        return;
+
+    bool hasMeshes = false;
+    bool hasPointClouds = false;
+    for (const ExposureEntity& target : targets)
+    {
+        hasMeshes = hasMeshes || (target.mesh != nullptr);
+        hasPointClouds = hasPointClouds || (target.mesh == nullptr);
+    }
+
+    ccSolisExposureDlg dlg(m_app->getMainWindow());
+    dlg.setOptions(s_exposureOptions);
+    dlg.setSelectionKinds(hasPointClouds, hasMeshes);
+    dlg.setQualityPresetIndex(s_exposureQualityPreset);
+    dlg.setAdvancedVisible(s_exposureAdvancedVisible);
+    if (!dlg.exec())
+        return;
+
+    solis::ExposureOptions options = dlg.options();
+    s_exposureOptions = options;
+    s_exposureQualityPreset = dlg.qualityPresetIndex();
+    s_exposureAdvancedVisible = dlg.advancedVisible();
+
+    QString validationError;
+    if (!solis::ExposureCalculator::ValidateOptions(options, &validationError))
+    {
+        QMessageBox::warning(m_app->getMainWindow(), tr("SOLIS Exposure"), validationError);
+        return;
+    }
+
+    const std::vector<ExposureEntity> visibleGeometry =
+        options.occlusionContext == solis::ExposureOcclusionContext::AllVisibleEntities
+            ? visibleExposureGeometry(m_app->dbRootObject())
+            : std::vector<ExposureEntity>{};
+
+    for (const ExposureEntity& target : targets)
+    {
+        ccHObject* obj = target.entity;
+        ccPointCloud* cloud = target.cloud;
+        ccGenericMesh* mesh = target.mesh;
+        if (!obj || !cloud)
+            continue;
+
+        solis::ExposureOptions entityOptions = options;
+        entityOptions.calculation.render.meshIsClosed = mesh && options.calculation.render.meshIsClosed;
+
+        std::vector<SOLISOccluder> occluders;
+        solis::ExposureContextInfo contextInfo;
+        buildExposureContext(target,
+                             targets,
+                             visibleGeometry,
+                             entityOptions.occlusionContext,
+                             occluders,
+                             contextInfo);
+        if (occluders.empty())
+        {
+            m_app->dispToConsole(tr("SOLIS Exposure: no occluding geometry available for '%1'").arg(obj->getName()),
+                                 ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+            continue;
+        }
+
+        std::unique_ptr<SOLISAccumulationBackend> backend = CreateSOLISAccumulationBackend();
+        if (!backend
+            || !backend->setOcclusionContext(occluders)
+            || !backend->init(entityOptions.calculation.render.resolution,
+                              entityOptions.calculation.render.resolution,
+                              cloud,
+                              mesh,
+                              entityOptions.calculation.render.meshIsClosed,
+                              entityOptions.calculation.render.depthBias,
+                              entityOptions.calculation.render.parallelCpuProjection,
+                              entityOptions.calculation.render.cpuThreadCount))
+        {
+            m_app->dispToConsole(tr("SOLIS Exposure: renderer initialization failed for '%1'").arg(obj->getName()),
+                                 ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+            continue;
+        }
+
+        m_app->dispToConsole(
+            tr("SOLIS Exposure '%1': context=%2, occluding entities=%3")
+                .arg(obj->getName(),
+                     solis::ExposureCalculator::OcclusionContextName(contextInfo.mode))
+                .arg(contextInfo.entityNames.size()),
+            ccMainAppInterface::STD_CONSOLE_MESSAGE);
+
+        std::unique_ptr<ccProgressDialog> progress = std::make_unique<ccProgressDialog>(true, m_app->getMainWindow());
+        solis::ExposureResult exposure;
+        QString error;
+        if (!solis::ExposureCalculator::Calculate(entityOptions, cloud, mesh, exposure,
+                                                   progress.get(), obj->getName(), backend.get(), &error))
+        {
+            const auto level = progress->wasCanceled() ? ccMainAppInterface::WRN_CONSOLE_MESSAGE
+                                                       : ccMainAppInterface::ERR_CONSOLE_MESSAGE;
+            m_app->dispToConsole(tr("SOLIS Exposure '%1': %2").arg(obj->getName(), error), level);
+            if (progress->wasCanceled())
+                return;
+            continue;
+        }
+
+        const QString runId = solis::ResultManager::NewRunId();
+        QStringList resultIds;
+        bool fieldFailure = false;
+        auto store = [&](const QString& metric, const QString& baseName, const std::vector<double>& values)
+        {
+            if (fieldFailure)
+                return;
+            solis::ResultField field;
+            if (!writeExposureField(cloud, baseName, values, field))
+            {
+                fieldFailure = true;
+                return;
+            }
+            solis::ResultManager::StoreExposureMetadata(cloud, field, metric, entityOptions,
+                                                        exposure.reference, contextInfo, runId, obj->getName());
+            resultIds.push_back(field.resultId);
+            m_app->dispToConsole(tr("SOLIS Exposure: created scalar field '%1'").arg(field.name),
+                                 ccMainAppInterface::STD_CONSOLE_MESSAGE);
+        };
+
+        if (solis::ExposureCalculator::HasMetric(entityOptions, solis::ExposureSky))
+            store(QStringLiteral("sky"), solis::ExposureCalculator::SkyFieldBaseName(entityOptions), exposure.sky);
+        if (solis::ExposureCalculator::HasMetric(entityOptions, solis::ExposureSun))
+            store(QStringLiteral("sun"), solis::ExposureCalculator::SunFieldBaseName(entityOptions), exposure.sun);
+        if (solis::ExposureCalculator::HasMetric(entityOptions, solis::ExposureRadiative))
+            store(QStringLiteral("radiative"), solis::ExposureCalculator::RadiativeFieldBaseName(entityOptions), exposure.radiative);
+
+        if (fieldFailure)
+        {
+            solis::ResultManager::RemoveRun(cloud, runId);
+            m_app->dispToConsole(tr("SOLIS Exposure: failed to create result fields for '%1'").arg(obj->getName()),
+                                 ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+            continue;
+        }
+
+        if (entityOptions.crownSummary)
+        {
+            solis::CrownExposureSummary summary;
+            if (!solis::CrownExposure::Summarize(cloud, mesh, exposure, entityOptions, summary, &error))
+            {
+                solis::ResultManager::RemoveRun(cloud, runId);
+                m_app->dispToConsole(tr("SOLIS Crown Exposure '%1': %2").arg(obj->getName(), error),
+                                     ccMainAppInterface::ERR_CONSOLE_MESSAGE);
+                continue;
+            }
+            solis::ResultManager::StoreCrownExposureMetadata(cloud, summary, entityOptions, contextInfo, runId,
+                                                             obj->getName(), resultIds);
+            const QString weightingDetail = summary.weightingMethod == QLatin1String("occupied-voxel")
+                                                ? tr(", voxel=%1 m").arg(summary.voxelSize, 0, 'g', 6)
+                                                : tr(", area=%1").arg(summary.representedSurfaceArea, 0, 'g', 8);
+            m_app->dispToConsole(
+                tr("SOLIS Crown Exposure '%1': CEI=%2, SkyMean=%3, SunMean=%4, REI P10/P50/P90=%5/%6/%7, >=%8=%9%, %10%11")
+                    .arg(obj->getName())
+                    .arg(summary.cei, 0, 'f', 4)
+                    .arg(optionalFraction(summary.skyMean))
+                    .arg(optionalFraction(summary.sunMean))
+                    .arg(summary.reiP10, 0, 'f', 4)
+                    .arg(summary.reiP50, 0, 'f', 4)
+                    .arg(summary.reiP90, 0, 'f', 4)
+                    .arg(summary.threshold, 0, 'f', 2)
+                    .arg(summary.exposedFraction * 100.0, 0, 'f', 1)
+                    .arg(summary.weightingMethod)
+                    .arg(weightingDetail),
+                ccMainAppInterface::STD_CONSOLE_MESSAGE);
+        }
+
+        obj->showSF(true);
+        obj->prepareDisplayForRefresh_recursive();
+    }
+
+    m_app->updatePropertiesView();
+    m_app->updateUI();
+    m_app->refreshAll();
+    onNewSelection(m_app->getSelectedEntities());
+}
+
+void qSOLIS::doExportCrownAction()
+{
+    if (!m_app)
+        return;
+
+    const ccHObject::Container& selection = m_app->getSelectedEntities();
+    QSet<ccPointCloud*> processed;
+    std::vector<solis::CrownExposureExportRecord> records;
+    QStringList skipped;
+
+    for (ccHObject* obj : selection)
+    {
+        if (!obj)
+            continue;
+        ccPointCloud* cloud = pointCloudForObject(obj);
+        if (!cloud || processed.contains(cloud))
+            continue;
+        processed.insert(cloud);
+
+        solis::CrownExposureExportRecord record;
+        if (solis::CrownExposureExport::LatestRecord(cloud, record))
+            records.push_back(std::move(record));
+        else
+            skipped.push_back(obj->getName());
+    }
+
+    if (records.empty())
+    {
+        QMessageBox::information(m_app->getMainWindow(),
+                                 tr("SOLIS Crown Exposure Export"),
+                                 tr("None of the selected entities has a stored Crown Exposure summary.\n\n"
+                                    "Run SOLIS Exposure with Crown Exposure Index enabled first."));
+        return;
+    }
+
+    QString path = QFileDialog::getSaveFileName(
+        m_app->getMainWindow(),
+        tr("Export Crown Exposure Summary"),
+        QDir::homePath() + QStringLiteral("/qSOLIS_crown_exposure_summary.csv"),
+        tr("CSV files (*.csv);;All files (*)"));
+    if (path.isEmpty())
+        return;
+    if (!path.endsWith(QStringLiteral(".csv"), Qt::CaseInsensitive))
+        path += QStringLiteral(".csv");
+
+    QString error;
+    if (!solis::CrownExposureExport::WriteCsv(path, records, &error))
+    {
+        QMessageBox::critical(m_app->getMainWindow(),
+                              tr("SOLIS Crown Exposure Export"),
+                              error);
+        return;
+    }
+
+    m_app->dispToConsole(
+        tr("SOLIS Crown Exposure export: wrote %1 tree/entity row(s) to '%2'%3")
+            .arg(static_cast<qulonglong>(records.size()))
+            .arg(path)
+            .arg(skipped.isEmpty()
+                     ? QString()
+                     : tr("; skipped %1 selected entity/entities without a crown summary")
+                           .arg(static_cast<qulonglong>(skipped.size()))),
+        ccMainAppInterface::STD_CONSOLE_MESSAGE);
+}
+
 void qSOLIS::doCleanupAction()
 {
     if (!m_app)
@@ -597,6 +1047,7 @@ void qSOLIS::doCleanupAction()
     m_app->updatePropertiesView();
     m_app->updateUI();
     m_app->refreshAll();
+    onNewSelection(m_app->getSelectedEntities());
 }
 
 void qSOLIS::registerCommands(ccCommandLineInterface* cmd)
@@ -604,5 +1055,7 @@ void qSOLIS::registerCommands(ccCommandLineInterface* cmd)
     if (!cmd)
         return;
     cmd->registerCommand(ccCommandLineInterface::Command::Shared(new SOLISCommand));
+    cmd->registerCommand(ccCommandLineInterface::Command::Shared(new SOLISExposureCommand));
+    cmd->registerCommand(ccCommandLineInterface::Command::Shared(new SOLISCrownExportCommand));
     cmd->registerCommand(ccCommandLineInterface::Command::Shared(new SOLISCleanupCommand));
 }

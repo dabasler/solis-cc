@@ -18,7 +18,11 @@ public:
 
 private:
     void doAction();
+    void doExposureAction();
+    void doExportCrownAction();
     void doCleanupAction();
     QAction* m_action = nullptr;
+    QAction* m_exposureAction = nullptr;
+    QAction* m_exportCrownAction = nullptr;
     QAction* m_cleanupAction = nullptr;
 };

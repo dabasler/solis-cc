@@ -243,3 +243,14 @@ metadata still contains the original name. Current metadata-driven cleanup can
 then remove the stale metadata record but cannot safely identify the manually
 renamed field; rename qSOLIS result fields only if you intend to manage them
 manually afterward.
+
+
+## Exposure result names (v1.1.0)
+
+```text
+SOLIS Sky Exposure [fraction] rays<rays> R<resolution>
+SOLIS Sun Exposure [fraction] D<day> T<clock> <zone> [dur<h>h dt<m>m] R<resolution>
+SOLIS Radiative Exposure [fraction] D<day> T<clock> <zone> [dur<h>h dt<m>m] H R<resolution>
+```
+
+The normal duplicate `#N` suffix applies. Exposure metadata uses schema 3 and `resultFamily=exposure`.

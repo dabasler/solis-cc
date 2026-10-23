@@ -1,4 +1,4 @@
-# qSOLIS v1.0.0 User Manual
+# qSOLIS v1.1.0 User Manual
 
 Solar visibility, irradiance, and irradiation analysis for CloudCompare
 
@@ -50,7 +50,7 @@ rules automatically.
 4. Configure the calculation.
 5. Press **OK**.
 
-The dialog displays **qSOLIS v1.0.0** at the bottom.
+The dialog displays **qSOLIS v1.1.0** at the bottom.
 
 ### 3.1 Location and time
 
@@ -107,7 +107,7 @@ Expand **Advanced options** for controls that are normally left at defaults.
 
 **Linke turbidity** controls clear-sky atmospheric attenuation. A constant value
 is used for the calculation interval. qSOLIS does not ingest measured cloud or
-weather time series in v1.0.0.
+weather time series in v1.1.0.
 
 ### Rendering and CPU
 
@@ -298,7 +298,7 @@ Compute/import normals for every selected point cloud or mesh vertex cloud.
 
 Confirm the sun is above the horizon for the selected location/time. If the same
 case works at one render resolution but not another, verify that you are using a
-v1.0.0 build with the explicit FBO renderer and check OpenGL limits/errors.
+v1.0.0-or-later build with the explicit FBO renderer and check OpenGL limits/errors.
 
 ### CLI fails on a headless server
 
@@ -312,7 +312,7 @@ removing unrelated scalar fields.
 
 ## 13. Scientific limitations
 
-qSOLIS v1.0.0 is a clear-sky model, not a complete weather simulator. Major
+qSOLIS v1.1.0 is a clear-sky model, not a complete weather simulator. Major
 limitations include:
 
 - No measured cloud cover or meteorological time-series input.
@@ -327,7 +327,19 @@ or engineering reports.
 
 ## 14. Version and license
 
-This manual describes **qSOLIS v1.0.0**, released 2026-10-15.
+This manual describes **qSOLIS v1.1.0**, updated 2026-10-23.
 
 qSOLIS is distributed under the GNU General Public License, version 2 or later.
 See the release `LICENSE` file.
+
+
+## 15. Canopy Exposure
+
+Use **Plugins > SOLIS Exposure...** for canopy exposure metrics. The **Occlusion context** control determines which geometry can block rays: Target only uses self-geometry; Selected entities (default) makes selected targets mutually occlude; All visible entities keeps results on selected targets while all visible clouds/meshes can act as neighboring blockers. Sky Exposure is pure upper-hemisphere visibility; Sun Exposure is the fraction of sampled daylight time with direct sun access; Radiative Exposure is received clear-sky direct+diffuse radiation divided by open-site horizontal potential. Crown Exposure Index is the spatially weighted crown mean REI, using occupied voxels for point clouds and surface area for meshes. See `CANOPY_EXPOSURE.md` for formulas, CLI options, naming, metadata, and limitations.
+
+## Exporting one Crown Exposure row per tree
+
+After calculating Crown Exposure, qSOLIS can turn the persistent per-entity summaries into a table. Keep each biological tree as a separate point-cloud/mesh entity, select the trees to export, and choose **Plugins > SOLIS Export Crown Exposure Summary...**. The GUI writes one CSV row per selected tree using its latest stored crown run.
+
+The CSV includes CEI, Sky/Sun means when calculated, REI mean/P10/P50/P90, exposed fraction, voxel or mesh weighting information, occlusion context and occluder names, site/time settings, and run/plugin/schema provenance. Missing optional values are left empty rather than written as zero. For command-line automation use `-SOLIS_EXPORT_CROWN <file.csv> [LATEST|ALL_RUNS]`.
+

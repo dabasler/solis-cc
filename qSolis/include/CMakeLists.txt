@@ -11,6 +11,14 @@ target_sources( ${PROJECT_NAME}
         ${CMAKE_CURRENT_LIST_DIR}/SOLISSolarModel.h
         ${CMAKE_CURRENT_LIST_DIR}/SOLISVersion.h
         ${CMAKE_CURRENT_LIST_DIR}/ccSolisDlg.h
+        ${CMAKE_CURRENT_LIST_DIR}/SOLISExposure.h
+        ${CMAKE_CURRENT_LIST_DIR}/SOLISExposureMath.h
+        ${CMAKE_CURRENT_LIST_DIR}/SOLISCrownExposure.h
+        ${CMAKE_CURRENT_LIST_DIR}/SOLISCrownExposureMath.h
+        ${CMAKE_CURRENT_LIST_DIR}/SOLISCrownExport.h
+        ${CMAKE_CURRENT_LIST_DIR}/SOLISCrownExportCommand.h
+        ${CMAKE_CURRENT_LIST_DIR}/SOLISExposureCommand.h
+        ${CMAKE_CURRENT_LIST_DIR}/ccSolisExposureDlg.h
         ${CMAKE_CURRENT_LIST_DIR}/qSOLIS.h
 )
 

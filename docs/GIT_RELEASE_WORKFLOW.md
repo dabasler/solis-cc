@@ -1,6 +1,6 @@
 # Git Release Workflow
 
-The recommended approach is to keep qSOLIS v1.0.0 in the **same repository** as
+The recommended approach is to keep qSOLIS v1.1.0 in the **same repository** as
 the original plugin so the history, authorship, and project identity remain intact.
 The legacy version can be preserved with a tag and optional maintenance branch.
 
@@ -22,16 +22,16 @@ git push origin v0.9-legacy
 git push origin legacy-qsolis-v0.9
 ```
 
-## Publish v1.0.0
+## Publish v1.1.0
 
 Bring the modern source onto the default branch, review the diff, then:
 
 ```bash
 git add -A
-git commit -m "Release qSOLIS 1.0.0"
-git tag -a v1.0.0 -m "qSOLIS 1.0.0"
+git commit -m "Release qSOLIS 1.1.0"
+git tag -a v1.1.0 -m "qSOLIS 1.1.0"
 git push origin main
-git push origin v1.0.0
+git push origin v1.1.0
 ```
 
 If your default branch is `master`, use that instead of `main`.

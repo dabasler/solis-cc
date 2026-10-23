@@ -30,3 +30,16 @@ wall sunlit median  : 834.6073 W/m2         PASS
 wall shadow median  : approximately 0 W/m2 PASS
 expected shadow length: 1.9746 m
 ```
+
+## Multi-entity exposure context
+
+`context_target_ground.ply` and `context_neighbor_wall.ply` are loaded as separate entities. The exposure regression verifies that `-CONTEXT TARGET` leaves the ground target exposed while `-CONTEXT LOADED` allows the separately loaded wall to cast the expected solar occlusion onto the target.
+
+
+Run the v1.1 canopy-exposure suite separately:
+
+```bash
+./run_qsolis_exposure_regression.sh /path/to/CloudCompare
+```
+
+It covers open-reference exposure, no-daylight rejection, wall Sun/Sky/REI behavior, and separate target/neighbor geometry for self-only versus loaded-context occlusion.

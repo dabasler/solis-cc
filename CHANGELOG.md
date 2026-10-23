@@ -2,6 +2,28 @@
 
 All notable changes to qSOLIS are documented here.
 
+## [1.1.0] - 2026-10-23
+
+### Added
+
+- `SOLIS Exposure...` GUI action and `-SOLIS_EXPOSURE` CLI command.
+- Sky Exposure Factor (SEF), Sun Exposure Fraction (SuEF), and Radiative Exposure Index (REI), all in `[0,1]`.
+- Crown Exposure Index (CEI) and weighted crown distribution statistics.
+- Occupied-voxel crown weighting for point clouds and triangle-area weighting for meshes.
+- Shared per-direction visibility masks so SEF/diffuse REI and SuEF/direct REI reuse the same FBO passes.
+- Schema-v3 exposure/crown metadata with cleanup integration.
+- Exposure math unit tests and open-reference/wall-shadow CLI regression scripts.
+- Explicit target/context separation for canopy exposure: Target only, Selected entities, and All visible entities in the GUI; TARGET/LOADED context in the CLI.
+- Multi-entity exposure renderer geometry cache so neighboring trees/terrain can occlude target points without merging point clouds.
+- Context provenance in exposure/crown metadata and a separate-neighbor regression scene.
+- `SOLIS Export Crown Exposure Summary...` GUI action and `-SOLIS_EXPORT_CROWN` CLI command for one-row-per-tree CSV export of persisted CEI summaries and provenance.
+
+### Changed
+
+- qSOLIS result metadata schema advances from 2 to 3; schema-2 records remain cleanup-compatible.
+- The visibility backend now exposes a reusable geometric visibility-mask primitive while preserving existing Direct/Diffuse/Total accumulation semantics.
+
+
 ## [1.0.0] - 2026-10-15
 
 First release of the modern Qt 6 / current-CloudCompare port.

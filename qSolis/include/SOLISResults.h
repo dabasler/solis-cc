@@ -4,10 +4,13 @@
 #include "SOLISBatch.h"
 
 #include <QString>
+#include <QStringList>
 
 #include <vector>
 
 class ccPointCloud;
+
+namespace solis { struct ExposureOptions; struct ExposureReference; struct ExposureContextInfo; struct CrownExposureSummary; }
 
 namespace solis
 {
@@ -100,6 +103,31 @@ public:
                                   ResultComponent component,
                                   const CalculationOptions& options,
                                   ResultField& result);
+
+
+    //! Allocates a persistent qSOLIS field with an explicit deterministic base name.
+    static bool CreateNamedResultField(ccPointCloud* cloud,
+                                       const QString& baseName,
+                                       ResultField& result);
+
+    //! Stores schema-v3 metadata for an exposure scalar field.
+    static void StoreExposureMetadata(ccPointCloud* cloud,
+                                      const ResultField& result,
+                                      const QString& metric,
+                                      const ExposureOptions& options,
+                                      const ExposureReference& reference,
+                                      const ExposureContextInfo& contextInfo,
+                                      const QString& runId,
+                                      const QString& entityName = QString());
+
+    //! Stores the entity-level Crown Exposure Index summary for an exposure run.
+    static void StoreCrownExposureMetadata(ccPointCloud* cloud,
+                                           const CrownExposureSummary& summary,
+                                           const ExposureOptions& options,
+                                           const ExposureContextInfo& contextInfo,
+                                           const QString& runId,
+                                           const QString& entityName,
+                                           const QStringList& sourceResultIds);
 
     //! Allocates a hidden temporary working field (used by TOTAL-only calculations).
     static bool CreateTemporaryField(ccPointCloud* cloud,

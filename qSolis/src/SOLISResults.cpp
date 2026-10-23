@@ -1,11 +1,14 @@
 #include "SOLISResults.h"
 #include "SOLISVersion.h"
+#include "SOLISExposure.h"
+#include "SOLISCrownExposure.h"
 
 #include <ccPointCloud.h>
 #include <ccScalarField.h>
 
 #include <QDateTime>
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QSet>
 #include <QStringList>
@@ -442,6 +445,26 @@ bool ResultManager::CreateResultField(ccPointCloud* cloud,
     return true;
 }
 
+bool ResultManager::CreateNamedResultField(ccPointCloud* cloud,
+                                           const QString& baseName,
+                                           ResultField& result)
+{
+    result = ResultField{};
+    if (!cloud || baseName.isEmpty())
+        return false;
+
+    result.name = UniqueFieldName(cloud, baseName);
+    result.index = cloud->addScalarField(qPrintable(result.name));
+    if (result.index < 0)
+    {
+        result = ResultField{};
+        return false;
+    }
+    result.resultId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    cloud->setCurrentScalarField(result.index);
+    return true;
+}
+
 bool ResultManager::CreateTemporaryField(ccPointCloud* cloud,
                                          ResultComponent component,
                                          const QString& runId,
@@ -560,6 +583,113 @@ void ResultManager::StoreMetadata(ccPointCloud* cloud,
     cloud->setMetaData(QStringLiteral("qSOLIS/lastRunId"), runId);
 }
 
+
+void ResultManager::StoreExposureMetadata(ccPointCloud* cloud,
+                                          const ResultField& result,
+                                          const QString& metric,
+                                          const ExposureOptions& options,
+                                          const ExposureReference& reference,
+                                          const ExposureContextInfo& contextInfo,
+                                          const QString& runId,
+                                          const QString& entityName)
+{
+    if (!cloud || !result.isValid() || result.resultId.isEmpty())
+        return;
+
+    QJsonObject exposure;
+    exposure.insert(QStringLiteral("metric"), metric);
+    exposure.insert(QStringLiteral("skyRayCount"), static_cast<int>(options.calculation.sampling.diffuseRayCount));
+    exposure.insert(QStringLiteral("crownSummaryRequested"), options.crownSummary);
+    exposure.insert(QStringLiteral("crownVoxelAuto"), options.crownVoxelAuto);
+    exposure.insert(QStringLiteral("crownVoxelSize"), options.crownVoxelSize);
+    exposure.insert(QStringLiteral("crownThreshold"), options.crownThreshold);
+    exposure.insert(QStringLiteral("daylightHours"), reference.daylightHours);
+    exposure.insert(QStringLiteral("openDirectPotential"), reference.openDirectPotential);
+    exposure.insert(QStringLiteral("openDiffusePotential"), reference.openDiffusePotential);
+    exposure.insert(QStringLiteral("openTotalPotential"), reference.openTotalPotential);
+    exposure.insert(QStringLiteral("occlusionContext"), ExposureCalculator::OcclusionContextName(contextInfo.mode));
+    exposure.insert(QStringLiteral("occluderCount"), contextInfo.entityNames.size());
+    QJsonArray occluders;
+    for (const QString& name : contextInfo.entityNames)
+        occluders.append(name);
+    exposure.insert(QStringLiteral("occluderEntities"), occluders);
+
+    QJsonObject record;
+    record.insert(QStringLiteral("schemaVersion"), solis::ResultMetadataSchemaVersion);
+    record.insert(QStringLiteral("plugin"), QStringLiteral("qSOLIS"));
+    record.insert(QStringLiteral("pluginVersion"), QString::fromLatin1(solis::Version));
+    record.insert(QStringLiteral("resultFamily"), QStringLiteral("exposure"));
+    record.insert(QStringLiteral("metric"), metric);
+    record.insert(QStringLiteral("runId"), runId);
+    record.insert(QStringLiteral("resultId"), result.resultId);
+    record.insert(QStringLiteral("fieldName"), result.name);
+    record.insert(QStringLiteral("component"), metric);
+    record.insert(QStringLiteral("unit"), QStringLiteral("fraction"));
+    record.insert(QStringLiteral("entityName"), entityName);
+    record.insert(QStringLiteral("createdUtc"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+    record.insert(QStringLiteral("options"), optionsJson(options.calculation));
+    record.insert(QStringLiteral("exposure"), exposure);
+
+    cloud->setMetaData(metadataKey(result.resultId), QString::fromUtf8(QJsonDocument(record).toJson(QJsonDocument::Compact)));
+    cloud->setMetaData(QStringLiteral("qSOLIS/schemaVersion"), solis::ResultMetadataSchemaVersion);
+    cloud->setMetaData(QStringLiteral("qSOLIS/pluginVersion"), QString::fromLatin1(solis::Version));
+    cloud->setMetaData(QStringLiteral("qSOLIS/lastRunId"), runId);
+}
+
+void ResultManager::StoreCrownExposureMetadata(ccPointCloud* cloud,
+                                               const CrownExposureSummary& summary,
+                                               const ExposureOptions& options,
+                                               const ExposureContextInfo& contextInfo,
+                                               const QString& runId,
+                                               const QString& entityName,
+                                               const QStringList& sourceResultIds)
+{
+    if (!cloud || runId.isEmpty())
+        return;
+
+    QJsonObject record;
+    record.insert(QStringLiteral("schemaVersion"), solis::ResultMetadataSchemaVersion);
+    record.insert(QStringLiteral("plugin"), QStringLiteral("qSOLIS"));
+    record.insert(QStringLiteral("pluginVersion"), QString::fromLatin1(solis::Version));
+    record.insert(QStringLiteral("resultFamily"), QStringLiteral("crownExposure"));
+    record.insert(QStringLiteral("runId"), runId);
+    record.insert(QStringLiteral("entityName"), entityName);
+    record.insert(QStringLiteral("createdUtc"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+    record.insert(QStringLiteral("cei"), summary.cei);
+    if (std::isfinite(summary.skyMean))
+        record.insert(QStringLiteral("skyMean"), summary.skyMean);
+    if (std::isfinite(summary.sunMean))
+        record.insert(QStringLiteral("sunMean"), summary.sunMean);
+    record.insert(QStringLiteral("radiativeMean"), summary.radiativeMean);
+    record.insert(QStringLiteral("reiP10"), summary.reiP10);
+    record.insert(QStringLiteral("reiP50"), summary.reiP50);
+    record.insert(QStringLiteral("reiP90"), summary.reiP90);
+    record.insert(QStringLiteral("exposedFraction"), summary.exposedFraction);
+    record.insert(QStringLiteral("threshold"), summary.threshold);
+    record.insert(QStringLiteral("weightingMethod"), summary.weightingMethod);
+    record.insert(QStringLiteral("voxelSize"), summary.voxelSize);
+    record.insert(QStringLiteral("occupiedVoxelCount"), static_cast<int>(summary.occupiedVoxelCount));
+    record.insert(QStringLiteral("representedSurfaceArea"), summary.representedSurfaceArea);
+    record.insert(QStringLiteral("pointOrVertexCount"), static_cast<int>(summary.pointOrVertexCount));
+    record.insert(QStringLiteral("occlusionContext"), ExposureCalculator::OcclusionContextName(contextInfo.mode));
+    record.insert(QStringLiteral("occluderCount"), contextInfo.entityNames.size());
+    QJsonArray occluders;
+    for (const QString& name : contextInfo.entityNames)
+        occluders.append(name);
+    record.insert(QStringLiteral("occluderEntities"), occluders);
+    record.insert(QStringLiteral("options"), optionsJson(options.calculation));
+
+    QJsonArray ids;
+    for (const QString& id : sourceResultIds)
+        ids.append(id);
+    record.insert(QStringLiteral("sourceExposureResultIds"), ids);
+
+    cloud->setMetaData(QStringLiteral("qSOLIS/crownExposure/%1").arg(runId),
+                       QString::fromUtf8(QJsonDocument(record).toJson(QJsonDocument::Compact)));
+    cloud->setMetaData(QStringLiteral("qSOLIS/schemaVersion"), solis::ResultMetadataSchemaVersion);
+    cloud->setMetaData(QStringLiteral("qSOLIS/pluginVersion"), QString::fromLatin1(solis::Version));
+    cloud->setMetaData(QStringLiteral("qSOLIS/lastRunId"), runId);
+}
 
 void ResultManager::StoreBatchMetadata(ccPointCloud* cloud,
                                        const BatchContext& batchContext,
@@ -748,10 +878,14 @@ CleanupStats ResultManager::RemoveRun(ccPointCloud* cloud, const QString& runId)
 {
     if (runId.isEmpty())
         return CleanupStats{};
-    return removeMatchingResults(cloud, [&runId](const ResultRecord& result)
+    CleanupStats stats = removeMatchingResults(cloud, [&runId](const ResultRecord& result)
     {
         return result.runId == runId;
     });
+    if (cloud && cloud->removeMetaData(QStringLiteral("qSOLIS/crownExposure/%1").arg(runId)))
+        ++stats.metadataRecordsRemoved;
+    refreshTrackingMetadata(cloud);
+    return stats;
 }
 
 CleanupStats ResultManager::RemoveBatch(ccPointCloud* cloud, const QString& batchId)
@@ -780,7 +914,8 @@ CleanupStats ResultManager::RemoveAll(ccPointCloud* cloud)
     const QVariantMap& metadata = cloud->metaData();
     for (auto it = metadata.constBegin(); it != metadata.constEnd(); ++it)
     {
-        if (it.key().startsWith(QStringLiteral("qSOLIS/batch/")))
+        if (it.key().startsWith(QStringLiteral("qSOLIS/batch/"))
+            || it.key().startsWith(QStringLiteral("qSOLIS/crownExposure/")))
             extraKeys.push_back(it.key());
     }
     extraKeys << QStringLiteral("qSOLIS/lastRunId")

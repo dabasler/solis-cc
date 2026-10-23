@@ -54,3 +54,8 @@ With CloudCompare auto-save enabled, cleanup exports the modified entities with 
 will save the entities itself.
 
 Deletion is permanent once the modified project/entity is saved.
+
+
+## Exposure results (schema 3)
+
+Canopy exposure scalar fields are normal metadata-backed qSOLIS results and are handled by Last Run / All cleanup. Crown summaries stored under `qSOLIS/crownExposure/<runId>` are removed with their run. Legacy-name cleanup behavior is unchanged.

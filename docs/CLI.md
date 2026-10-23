@@ -1,4 +1,4 @@
-# qSOLIS v1.0.0 Command-Line Reference
+# qSOLIS v1.1.0 Command-Line Reference
 
 qSOLIS registers two CloudCompare commands:
 
@@ -180,3 +180,62 @@ when you want to control output later with CloudCompare save commands.
 `-SILENT` suppresses qSOLIS progress dialogs, but the current visibility renderer
 still requires a usable Qt/OpenGL platform. A completely displayless Linux host
 may need an offscreen-capable Qt/OpenGL configuration or a virtual display.
+
+
+## `-SOLIS_EXPOSURE`
+
+Canopy exposure analysis is documented in detail in `CANOPY_EXPOSURE.md`.
+
+```text
+-METRICS SKY|SUN|RADIATIVE|ALL
+-CONTEXT TARGET|LOADED
+    TARGET = self-occlusion only.
+    LOADED = all loaded clouds/meshes mutually occlude (default).
+-DOY <value>
+-TIME <HH:MM[:SS]>
+-DURATION <hours>       # 0 = instantaneous
+-TIMESTEP <minutes>
+-LAT <degrees>
+-LON <degrees>
+-ELV <metres>
+-TIME_MODE UTC|LOCAL
+-UTC_OFFSET <hours>
+-LINKE_TURBIDITY <value>
+-SKY_RAYS <count>
+-RESOLUTION <pixels>
+-DEPTH_BIAS <value>
+-THREADS <count>
+-IS_CLOSED
+-ACCEL_ANGLE <degrees>
+-NO_ACCEL
+-CROWN_SUMMARY
+-CROWN_VOXEL_AUTO
+-CROWN_VOXEL_SIZE <metres>
+-CROWN_THRESHOLD <0..1>
+```
+
+### Exposure target/context semantics
+
+`-SOLIS_EXPOSURE` writes results to every loaded target entity. With `-CONTEXT LOADED`, all loaded clouds/meshes participate in the visibility renderer for every target, so neighboring trees mutually shade one another without merging geometry. With `-CONTEXT TARGET`, each target uses self-geometry only. The GUI additionally supports **All visible entities**, where unselected visible objects can be context-only occluders.
+
+## Crown Exposure CSV export
+
+Persisted Crown Exposure summaries can be exported without recalculating exposure:
+
+```text
+-SOLIS_EXPORT_CROWN <output.csv> [LATEST|ALL_RUNS]
+```
+
+`LATEST` is the default and writes one row per loaded cloud/mesh (deduplicated by associated point cloud), using its most recent `qSOLIS/crownExposure/<runId>` record. `ALL_RUNS` writes every stored crown summary for each loaded entity. Existing output files are replaced.
+
+Example:
+
+```bash
+CloudCompare -SILENT \
+  -O Tree_001.bin \
+  -O Tree_002.bin \
+  -SOLIS_EXPORT_CROWN crown_exposure.csv
+```
+
+The CSV includes CEI, optional Sky/Sun means, REI distribution statistics, exposed fraction, weighting/voxel information, occlusion context and occluder entities, solar/site settings, and run/plugin/schema provenance.
+

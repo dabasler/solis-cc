@@ -13,7 +13,7 @@ For every tag matching `v*.*.*` the workflow:
    - Windows / MSVC / x86_64,
    - macOS / Clang / arm64;
 4. runs the standalone qSOLIS solar-model CTest on every platform;
-5. runs the frozen OpenGL/FBO regression suite on the Linux runner under Xvfb;
+5. runs both the frozen v1.0 OpenGL/FBO regression suite and the v1.1 canopy-exposure regression suite on the Linux runner under Xvfb;
 6. installs CloudCompare into a private staging prefix;
 7. extracts qSOLIS from that install tree while preserving its install-relative path;
 8. creates a ZIP plus SHA-256 file for each platform;
@@ -34,19 +34,19 @@ The workflow-dispatch form lets you test another CloudCompare tag, branch, or co
 
 ## Expected assets
 
-For qSOLIS `1.0.0` built against CloudCompare `v2.14.beta2`, the draft release receives files similar to:
+For qSOLIS `1.1.0` built against CloudCompare `v2.14.beta2`, the draft release receives files similar to:
 
 ```text
-qSOLIS-1.0.0-CloudCompare-v2.14.beta2-linux-x86_64-ubuntu24.04-gcc.zip
-qSOLIS-1.0.0-CloudCompare-v2.14.beta2-linux-x86_64-ubuntu24.04-gcc.zip.sha256
+qSOLIS-1.1.0-CloudCompare-v2.14.beta2-linux-x86_64-ubuntu24.04-gcc.zip
+qSOLIS-1.1.0-CloudCompare-v2.14.beta2-linux-x86_64-ubuntu24.04-gcc.zip.sha256
 
-qSOLIS-1.0.0-CloudCompare-v2.14.beta2-windows-x64-msvc.zip
-qSOLIS-1.0.0-CloudCompare-v2.14.beta2-windows-x64-msvc.zip.sha256
+qSOLIS-1.1.0-CloudCompare-v2.14.beta2-windows-x64-msvc.zip
+qSOLIS-1.1.0-CloudCompare-v2.14.beta2-windows-x64-msvc.zip.sha256
 
-qSOLIS-1.0.0-CloudCompare-v2.14.beta2-macos-arm64-clang-unsigned.zip
-qSOLIS-1.0.0-CloudCompare-v2.14.beta2-macos-arm64-clang-unsigned.zip.sha256
+qSOLIS-1.1.0-CloudCompare-v2.14.beta2-macos-arm64-clang-unsigned.zip
+qSOLIS-1.1.0-CloudCompare-v2.14.beta2-macos-arm64-clang-unsigned.zip.sha256
 
-qSOLIS_User_Manual_v1.0.0.pdf
+# plus qSOLIS_User_Manual_v1.1.0.pdf when that optional release asset is present
 ```
 
 GitHub also provides its normal source-code ZIP/tar.gz automatically for the tag.
@@ -56,15 +56,15 @@ GitHub also provides its normal source-code ZIP/tar.gz automatically for the tag
 After committing the workflow and confirming a manual build works:
 
 ```bash
-git tag -a v1.0.0 -m "qSOLIS 1.0.0"
-git push origin v1.0.0
+git tag -a v1.1.0 -m "qSOLIS 1.1.0"
+git push origin v1.1.0
 ```
 
 The GitHub Release stays in draft state until every build job has completed successfully.
 
 ## Why the Linux runner runs the full regression suite
 
-The frozen regression suite uses an OpenGL framebuffer. Linux CI can run it consistently through Xvfb/software Mesa. Hosted Windows/macOS graphics availability can vary, so those jobs gate the release on compilation, installation, plugin packaging, and the non-OpenGL CTest. A physical-machine smoke test is still recommended before claiming full Windows/macOS runtime support.
+Both end-to-end regression suites use the OpenGL framebuffer. Linux CI can run them consistently through Xvfb/software Mesa. Hosted Windows/macOS graphics availability can vary, so those jobs gate the release on compilation, installation, plugin packaging, and the non-OpenGL CTest. A physical-machine smoke test is still recommended before claiming full Windows/macOS runtime support.
 
 ## macOS signing
 

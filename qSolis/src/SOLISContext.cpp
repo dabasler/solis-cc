@@ -19,6 +19,7 @@
 #include <atomic>
 #include <cmath>
 #include <limits>
+#include <new>
 #include <thread>
 #include <type_traits>
 
@@ -60,6 +61,37 @@ SOLISContext::~SOLISContext()
     delete m_glSurface;
 }
 
+bool SOLISContext::setOcclusionContext(const std::vector<SOLISOccluder>& occluders)
+{
+    // Must be configured before init(), because geometry is uploaded once and reused.
+    if (m_vertexBuffer || m_framebuffer || m_glContext)
+        return false;
+
+    m_occlusionContext.clear();
+    try
+    {
+        for (const SOLISOccluder& occluder : occluders)
+        {
+            if (!occluder.cloud)
+                continue;
+            const auto duplicate = std::find_if(m_occlusionContext.begin(), m_occlusionContext.end(),
+                                                [&](const SOLISOccluder& existing)
+                                                {
+                                                    return existing.cloud == occluder.cloud
+                                                        && existing.mesh == occluder.mesh;
+                                                });
+            if (duplicate == m_occlusionContext.end())
+                m_occlusionContext.push_back(occluder);
+        }
+    }
+    catch (const std::bad_alloc&)
+    {
+        m_occlusionContext.clear();
+        return false;
+    }
+    return true;
+}
+
 bool SOLISContext::init(unsigned W,
                         unsigned H,
                         GenericCloud* cloud,
@@ -83,10 +115,21 @@ bool SOLISContext::init(unsigned W,
     m_parallelCpuProjection = parallelCpuProjection;
     m_cpuThreadCount = automaticThreadCount(cpuThreadCount);
 
+    m_contextRendering = !m_occlusionContext.empty();
+    if (m_occlusionContext.size() == 1
+        && m_occlusionContext.front().cloud == cloud
+        && m_occlusionContext.front().mesh == mesh)
+    {
+        // A one-entity context is exactly the legacy self-occlusion problem. Keep
+        // the original renderer path byte-for-byte for numerical compatibility and
+        // to preserve the closed-mesh optimization.
+        m_contextRendering = false;
+    }
     try
     {
         m_snapZ.assign(pixelCount, 0.0f);
-        if (mesh && !m_meshIsClosed)
+        m_snapC.clear();
+        if (!m_contextRendering && mesh && !m_meshIsClosed)
             m_snapC.assign(pixelCount * 4u, 0u);
     }
     catch (const std::bad_alloc&)
@@ -95,8 +138,14 @@ bool SOLISContext::init(unsigned W,
     }
 
     associateToEntity(cloud, mesh);
-    if (!buildGeometryCache() || !glInit() || !makeCurrent())
+    if (m_contextRendering)
+        computeContextBoundingBox();
+    if (!(m_contextRendering ? buildContextGeometryCache() : buildGeometryCache())
+        || !glInit()
+        || !makeCurrent())
+    {
         return false;
+    }
 
     auto* functions = QOpenGLVersionFunctionsFactory::get<QOpenGLFunctions_2_1>(m_glContext);
     if (!functions)
@@ -275,6 +324,135 @@ bool SOLISContext::buildGeometryCache()
     return true;
 }
 
+void SOLISContext::computeContextBoundingBox()
+{
+    bool haveBounds = false;
+    CCVector3 bbMin;
+    CCVector3 bbMax;
+
+    for (const SOLISOccluder& occluder : m_occlusionContext)
+    {
+        if (!occluder.cloud || occluder.cloud->size() == 0)
+            continue;
+
+        CCVector3 localMin;
+        CCVector3 localMax;
+        occluder.cloud->getBoundingBox(localMin, localMax);
+        if (!haveBounds)
+        {
+            bbMin = localMin;
+            bbMax = localMax;
+            haveBounds = true;
+        }
+        else
+        {
+            bbMin.x = std::min(bbMin.x, localMin.x);
+            bbMin.y = std::min(bbMin.y, localMin.y);
+            bbMin.z = std::min(bbMin.z, localMin.z);
+            bbMax.x = std::max(bbMax.x, localMax.x);
+            bbMax.y = std::max(bbMax.y, localMax.y);
+            bbMax.z = std::max(bbMax.z, localMax.z);
+        }
+    }
+
+    if (!haveBounds)
+        return;
+
+    m_entityDiagonal = (bbMax - bbMin).norm();
+    m_entityCenter = (bbMax + bbMin) / 2;
+    if (!GreaterThanEpsilon(m_entityDiagonal))
+        m_entityDiagonal = PC_ONE;
+}
+
+bool SOLISContext::buildContextGeometryCache()
+{
+    try
+    {
+        const unsigned targetPointCount = m_vertices->size();
+        m_points.resize(targetPointCount);
+        m_vertices->placeIteratorAtBeginning();
+        for (unsigned i = 0; i < targetPointCount; ++i)
+        {
+            const CCVector3* p = m_vertices->getNextPoint();
+            if (!p)
+                return false;
+            m_points[i] = p->toDouble();
+        }
+
+        m_drawVertices.clear();
+        m_indices.clear();
+        m_contextDrawBatches.clear();
+        m_useIndexBuffer = false;
+        m_drawVertexCount = 0;
+
+        for (const SOLISOccluder& occluder : m_occlusionContext)
+        {
+            if (!occluder.cloud || occluder.cloud->size() == 0)
+                continue;
+
+            ContextDrawBatch batch;
+            batch.firstVertex = static_cast<unsigned>(m_drawVertices.size() / 3u);
+            batch.triangles = (occluder.mesh != nullptr);
+
+            if (occluder.mesh)
+            {
+                const unsigned triangleCount = occluder.mesh->size();
+                if (static_cast<size_t>(triangleCount) * 3u > static_cast<size_t>(std::numeric_limits<GLsizei>::max()))
+                    return false;
+                m_drawVertices.reserve(m_drawVertices.size() + static_cast<size_t>(triangleCount) * 9u);
+                occluder.mesh->placeIteratorAtBeginning();
+                for (unsigned i = 0; i < triangleCount; ++i)
+                {
+                    const GenericTriangle* tri = occluder.mesh->_getNextTriangle();
+                    if (!tri)
+                        return false;
+                    const CCVector3* verts[3] = {tri->_getA(), tri->_getB(), tri->_getC()};
+                    for (const CCVector3* v : verts)
+                    {
+                        m_drawVertices.push_back(v->x);
+                        m_drawVertices.push_back(v->y);
+                        m_drawVertices.push_back(v->z);
+                    }
+                }
+                batch.vertexCount = triangleCount * 3u;
+            }
+            else
+            {
+                const unsigned pointCount = occluder.cloud->size();
+                if (static_cast<size_t>(pointCount) > static_cast<size_t>(std::numeric_limits<GLsizei>::max()))
+                    return false;
+                m_drawVertices.reserve(m_drawVertices.size() + static_cast<size_t>(pointCount) * 3u);
+                occluder.cloud->placeIteratorAtBeginning();
+                for (unsigned i = 0; i < pointCount; ++i)
+                {
+                    const CCVector3* point = occluder.cloud->getNextPoint();
+                    if (!point)
+                        return false;
+                    m_drawVertices.push_back(point->x);
+                    m_drawVertices.push_back(point->y);
+                    m_drawVertices.push_back(point->z);
+                }
+                batch.vertexCount = pointCount;
+            }
+
+            if (batch.vertexCount != 0)
+                m_contextDrawBatches.push_back(batch);
+        }
+
+        if (m_contextDrawBatches.empty() || m_drawVertices.empty())
+            return false;
+        if (m_drawVertices.size() / 3u > static_cast<size_t>(std::numeric_limits<GLsizei>::max()))
+            return false;
+
+        m_drawVertexCount = static_cast<unsigned>(m_drawVertices.size() / 3u);
+    }
+    catch (const std::bad_alloc&)
+    {
+        return false;
+    }
+    return true;
+}
+
 bool SOLISContext::glInit()
 {
     m_glContext = new QOpenGLContext;
@@ -336,6 +514,9 @@ bool SOLISContext::uploadGeometry()
 
 bool SOLISContext::drawEntity()
 {
+    if (m_contextRendering)
+        return drawContext();
+
     if (!m_vertexBuffer || !m_vertexBuffer->bind())
         return false;
 
@@ -380,15 +561,35 @@ bool SOLISContext::drawEntity()
     return true;
 }
 
-bool SOLISContext::projectVisible(unsigned pointIndex,
-                                  const double* viewMatrix,
-                                  const double* projectionMatrix,
-                                  const int* viewport,
-                                  const CCVector3d& surfaceToSource,
-                                  solis::SpatialMode spatialMode,
-                                  const std::vector<CCVector3d>* normals,
-                                  double scalarWeight,
-                                  double& contribution) const
+bool SOLISContext::drawContext()
+{
+    if (!m_vertexBuffer || !m_vertexBuffer->bind())
+        return false;
+
+    auto* functions = QOpenGLVersionFunctionsFactory::get<QOpenGLFunctions_2_1>(m_glContext);
+    if (!functions)
+    {
+        m_vertexBuffer->release();
+        return false;
+    }
+
+    functions->glEnableClientState(GL_VERTEX_ARRAY);
+    functions->glVertexPointer(3, coordinateGLType(), 0, nullptr);
+    for (const ContextDrawBatch& batch : m_contextDrawBatches)
+    {
+        functions->glDrawArrays(batch.triangles ? GL_TRIANGLES : GL_POINTS,
+                                static_cast<GLint>(batch.firstVertex),
+                                static_cast<GLsizei>(batch.vertexCount));
+    }
+    functions->glDisableClientState(GL_VERTEX_ARRAY);
+    m_vertexBuffer->release();
+    return true;
+}
+
+bool SOLISContext::projectDepthVisible(unsigned pointIndex,
+                                       const double* viewMatrix,
+                                       const double* projectionMatrix,
+                                       const int* viewport) const
 {
     CCVector3d p2d;
     ccGL::Project<double, double>(m_points[pointIndex], viewMatrix, projectionMatrix, viewport, p2d);
@@ -400,7 +601,7 @@ bool SOLISContext::projectVisible(unsigned pointIndex,
 
     const size_t dec = static_cast<size_t>(x) + static_cast<size_t>(y) * m_width;
 
-    if (m_mesh && !m_meshIsClosed)
+    if (!m_contextRendering && m_mesh && !m_meshIsClosed)
     {
         uint8_t col = m_snapC[dec * 4u];
         if (x + 1 < static_cast<int>(m_width))
@@ -416,40 +617,26 @@ bool SOLISContext::projectVisible(unsigned pointIndex,
             return false;
     }
 
-    if (p2d.z >= static_cast<double>(m_snapZ[dec]))
-        return false;
-
-    double incidence = 1.0;
-    if (spatialMode == solis::SpatialMode::HorizontalIrradiance)
-    {
-        incidence = std::max(0.0, surfaceToSource.z);
-    }
-    else if (spatialMode == solis::SpatialMode::SurfaceIrradiance)
-    {
-        if (!normals || pointIndex >= normals->size())
-            return false;
-        incidence = std::max(0.0, (*normals)[pointIndex].dot(surfaceToSource));
-    }
-
-    contribution = scalarWeight * incidence;
-    return contribution != 0.0 || spatialMode == solis::SpatialMode::Visibility;
+    return p2d.z < static_cast<double>(m_snapZ[dec]);
 }
 
-int SOLISContext::accumulate(std::vector<double>& accumulator,
-                             const CCVector3d& lightTravelDirection,
-                             double scalarWeight,
-                             solis::SpatialMode spatialMode,
-                             const std::vector<CCVector3d>* normals)
+int SOLISContext::visibility(std::vector<uint8_t>& visible,
+                             const CCVector3d& lightTravelDirection)
 {
     if (!m_pixelBuffer || !m_pixelBuffer->isCreated() || !m_vertices)
         return -1;
-    if (accumulator.size() != m_points.size())
-        return -1;
-    if (spatialMode == solis::SpatialMode::SurfaceIrradiance
-        && (!normals || normals->size() != m_points.size()))
-        return -1;
     if (!makeCurrent())
         return -2;
+
+    try
+    {
+        visible.assign(m_points.size(), 0u);
+    }
+    catch (const std::bad_alloc&)
+    {
+        m_glContext->doneCurrent();
+        return -1;
+    }
 
     const auto fail = [this](int code)
     {
@@ -470,7 +657,6 @@ int SOLISContext::accumulate(std::vector<double>& accumulator,
     if (n2 <= 1.0e-20)
         return fail(-1);
     viewDir /= std::sqrt(n2);
-    const CCVector3d surfaceToSource = -viewDir;
 
     functions->glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     functions->glClearDepth(1.0);
@@ -493,7 +679,6 @@ int SOLISContext::accumulate(std::vector<double>& accumulator,
         xMax *= static_cast<double>(m_width) / static_cast<double>(m_height);
     else if (m_height > m_width)
         yMax *= static_cast<double>(m_height) / static_cast<double>(m_width);
-    // Keep enough Z range even for entities whose physical diagonal is below one world unit.
     const double zMax = std::max<double>(m_entityDiagonal + 2.0, 2.0);
     functions->glOrtho(-xMax, xMax, -yMax, yMax, -zMax, zMax);
     functions->glGetDoublev(GL_PROJECTION_MATRIX, projectionMat);
@@ -509,30 +694,42 @@ int SOLISContext::accumulate(std::vector<double>& accumulator,
     functions->glMultMatrixd(viewMat.data());
     functions->glColor3ub(255, 255, 0);
 
-    const GLboolean drawColor = (m_mesh && !m_meshIsClosed) ? GL_TRUE : GL_FALSE;
+    const GLboolean drawColor = (!m_contextRendering && m_mesh && !m_meshIsClosed) ? GL_TRUE : GL_FALSE;
     functions->glColorMask(drawColor, drawColor, drawColor, drawColor);
 
     int viewport[4]{0, 0, static_cast<int>(m_width), static_cast<int>(m_height)};
     functions->glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 
-    functions->glCullFace(GL_BACK);
-    if (!drawEntity())
-        return fail(-6);
-    if (m_mesh && !m_meshIsClosed)
+    if (m_contextRendering)
     {
-        functions->glCullFace(GL_FRONT);
+        // Exposure context geometry is an occlusion shell: triangles block from
+        // either side and point clouds retain the legacy one-pixel footprint.
+        functions->glDisable(GL_CULL_FACE);
         if (!drawEntity())
             return fail(-6);
-
-        if (!m_pixelBuffer->bind())
-            return fail(-4);
-        functions->glReadPixels(0, 0, viewport[2], viewport[3], GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-        if (!m_pixelBuffer->read(0, m_snapC.data(), static_cast<int>(m_snapC.size())))
+    }
+    else
+    {
+        functions->glEnable(GL_CULL_FACE);
+        functions->glCullFace(GL_BACK);
+        if (!drawEntity())
+            return fail(-6);
+        if (m_mesh && !m_meshIsClosed)
         {
+            functions->glCullFace(GL_FRONT);
+            if (!drawEntity())
+                return fail(-6);
+
+            if (!m_pixelBuffer->bind())
+                return fail(-4);
+            functions->glReadPixels(0, 0, viewport[2], viewport[3], GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+            if (!m_pixelBuffer->read(0, m_snapC.data(), static_cast<int>(m_snapC.size())))
+            {
+                m_pixelBuffer->release();
+                return fail(-5);
+            }
             m_pixelBuffer->release();
-            return fail(-5);
         }
-        m_pixelBuffer->release();
     }
 
     if (!m_pixelBuffer->bind())
@@ -557,18 +754,9 @@ int SOLISContext::accumulate(std::vector<double>& accumulator,
         int localCount = 0;
         for (unsigned i = begin; i < end; ++i)
         {
-            double contribution = 0.0;
-            if (projectVisible(i,
-                               viewMat.data(),
-                               projectionMat,
-                               viewport,
-                               surfaceToSource,
-                               spatialMode,
-                               normals,
-                               scalarWeight,
-                               contribution))
+            if (projectDepthVisible(i, viewMat.data(), projectionMat, viewport))
             {
-                accumulator[i] += contribution;
+                visible[i] = 1u;
                 ++localCount;
             }
         }
@@ -596,10 +784,74 @@ int SOLISContext::accumulate(std::vector<double>& accumulator,
     }
 
     const int resultVisible = visibleCount.load(std::memory_order_relaxed);
-
     m_framebuffer->release();
     m_glContext->doneCurrent();
     return resultVisible;
+}
+
+int SOLISContext::accumulate(std::vector<double>& accumulator,
+                             const CCVector3d& lightTravelDirection,
+                             double scalarWeight,
+                             solis::SpatialMode spatialMode,
+                             const std::vector<CCVector3d>* normals)
+{
+    if (accumulator.size() != m_points.size())
+        return -1;
+    if (spatialMode == solis::SpatialMode::SurfaceIrradiance
+        && (!normals || normals->size() != m_points.size()))
+        return -1;
+
+    const int visibleCount = visibility(m_visibilityScratch, lightTravelDirection);
+    if (visibleCount < 0)
+        return visibleCount;
+
+    CCVector3d viewDir = lightTravelDirection;
+    const double n2 = viewDir.norm2();
+    if (n2 <= 1.0e-20)
+        return -1;
+    viewDir /= std::sqrt(n2);
+    const CCVector3d surfaceToSource = -viewDir;
+
+    const unsigned n = static_cast<unsigned>(m_visibilityScratch.size());
+    const unsigned threadCount = (m_parallelCpuProjection && n >= 50000)
+                               ? std::max(1u, std::min(m_cpuThreadCount, n / 10000u))
+                               : 1u;
+    auto worker = [&](unsigned begin, unsigned end)
+    {
+        for (unsigned i = begin; i < end; ++i)
+        {
+            if (!m_visibilityScratch[i])
+                continue;
+            double incidence = 1.0;
+            if (spatialMode == solis::SpatialMode::HorizontalIrradiance)
+                incidence = std::max(0.0, surfaceToSource.z);
+            else if (spatialMode == solis::SpatialMode::SurfaceIrradiance)
+                incidence = std::max(0.0, (*normals)[i].dot(surfaceToSource));
+            accumulator[i] += scalarWeight * incidence;
+        }
+    };
+
+    if (threadCount == 1)
+    {
+        worker(0, n);
+    }
+    else
+    {
+        std::vector<std::thread> threads;
+        threads.reserve(threadCount);
+        const unsigned block = (n + threadCount - 1u) / threadCount;
+        for (unsigned t = 0; t < threadCount; ++t)
+        {
+            const unsigned begin = t * block;
+            const unsigned end = std::min(n, begin + block);
+            if (begin < end)
+                threads.emplace_back(worker, begin, end);
+        }
+        for (auto& thread : threads)
+            thread.join();
+    }
+
+    return visibleCount;
 }
 
 

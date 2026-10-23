@@ -228,6 +228,11 @@ jobs:
             "$CC_BIN" \
             "$GITHUB_WORKSPACE/regression-output"
 
+          LIBGL_ALWAYS_SOFTWARE=1 QT_QPA_PLATFORM=xcb xvfb-run -a \
+            qSolis/tests/regression/run_qsolis_exposure_regression.sh \
+            "$CC_BIN" \
+            "$GITHUB_WORKSPACE/regression-output-exposure"
+
       - name: Package plugin binary
         shell: bash -el {0}
         run: |

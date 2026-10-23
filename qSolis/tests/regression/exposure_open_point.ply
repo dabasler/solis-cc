@@ -1,0 +1,10 @@
+ply
+format ascii 1.0
+comment qSOLIS exposure regression open reference
+comment axes: X=east, Y=north, Z=up
+element vertex 1
+property float x
+property float y
+property float z
+end_header
+0 0 0

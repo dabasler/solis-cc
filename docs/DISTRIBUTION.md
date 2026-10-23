@@ -5,11 +5,11 @@ built for one CloudCompare/Qt/compiler combination should not be presented as a
 universal binary for arbitrary CloudCompare installations.
 
 
-## CloudCompare release status at qSOLIS 1.0.0
+## CloudCompare release status at qSOLIS 1.1.0
 
-At the qSOLIS 1.0.0 release date (2026-10-15), CloudCompare's latest stable
+At the qSOLIS 1.1.0 release date (2026-10-15), CloudCompare's latest stable
 release is still 2.13.2 (Qt 5), while the 2.14 line is available as Qt 6
-pre-releases (including v2.14.beta2) and current master. qSOLIS 1.0.0 targets
+pre-releases (including v2.14.beta2) and current master. qSOLIS 1.1.0 targets
 the Qt 6 / 2.14 line, so do **not** publish its binaries as compatible with the
 2.13.2 stable binary. Build against an exact 2.14 tag/commit and name the asset
 accordingly.
@@ -19,15 +19,15 @@ accordingly.
 Build and publish separate artifacts identified by:
 
 ```text
-qSOLIS-1.0.0-CloudCompare-<CC_VERSION>-<OS>-<ARCH>-<TOOLCHAIN>.zip
+qSOLIS-1.1.0-CloudCompare-<CC_VERSION>-<OS>-<ARCH>-<TOOLCHAIN>.zip
 ```
 
 Examples:
 
 ```text
-qSOLIS-1.0.0-CloudCompare-2.14.beta2-Windows-x64-MSVC.zip
-qSOLIS-1.0.0-CloudCompare-2.14.beta2-macOS-arm64-Clang.zip
-qSOLIS-1.0.0-CloudCompare-2.14.beta2-macOS-x86_64-Clang.zip
+qSOLIS-1.1.0-CloudCompare-2.14.beta2-Windows-x64-MSVC.zip
+qSOLIS-1.1.0-CloudCompare-2.14.beta2-macOS-arm64-Clang.zip
+qSOLIS-1.1.0-CloudCompare-2.14.beta2-macOS-x86_64-Clang.zip
 ```
 
 Use the exact CloudCompare release/tag (or clearly identified commit) and the same

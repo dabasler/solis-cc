@@ -1,21 +1,19 @@
-# qSOLIS v1.0.0 Release Checklist
+# qSOLIS v1.1.0 Release Checklist
 
-Use this checklist before publishing source or a platform binary.
+## Source review
 
-## Source release
+- [x] Version is `1.1.0` in `VERSION`, CMake, `info.json`, and `SOLISVersion.h`.
+- [x] Result metadata schema is 3.
+- [x] Existing Direct/Diffuse/Total naming and numerical equations are unchanged.
+- [x] `SOLIS Exposure...` GUI action is registered.
+- [x] `-SOLIS_EXPOSURE` CLI command is registered.
+- [x] Exposure/crown metadata participates in cleanup.
+- [x] Canopy-exposure formulas and limitations are documented.
+- [x] Pure exposure/crown math tests pass in the preparation environment.
 
-- [x] Version centralized as `1.0.0` in `SOLISVersion.h`.
-- [x] GUI shows `qSOLIS v1.0.0`.
-- [x] Plugin `info.json` reports `1.0.0`.
-- [x] Result metadata records the qSOLIS version.
-- [x] Runtime diagnostic spam removed; errors and concise result messages retained.
-- [x] README, CLI reference, naming rules, cleanup docs, changelog, release notes, and manual consolidated.
-- [x] Frozen regression inputs and expected results included.
-- [x] User manual visually verified as DOCX and PDF.
+## Required build acceptance
 
-## Build acceptance
-
-Run from a clean CloudCompare checkout/build directory:
+From a clean CloudCompare 2.14/Qt6 source checkout:
 
 ```bash
 cmake -S . -B build-release -G Ninja \
@@ -29,28 +27,20 @@ ctest --test-dir build-release --output-on-failure -R qsolis
 cmake --install build-release
 ```
 
-Then run `qSolis/tests/regression/run_qsolis_regression.sh` against the installed
-CloudCompare executable.
+Then run both end-to-end suites against the installed executable:
 
-## Binary release acceptance
+```bash
+qSolis/tests/regression/run_qsolis_regression.sh /path/to/CloudCompare
+qSolis/tests/regression/run_qsolis_exposure_regression.sh /path/to/CloudCompare
+```
 
-For each OS/architecture/CloudCompare target:
+## Manual GUI acceptance
 
-- [ ] Build against an exact CloudCompare tag or commit, not an unspecified `master`.
-- [ ] Record CloudCompare version/commit, Qt version, compiler/toolchain, OS, and architecture.
-- [ ] Test installation into a clean matching CloudCompare installation.
-- [ ] Run the frozen qSOLIS regression suite on that binary.
-- [ ] Smoke-test GUI Calculate and Cleanup actions.
-- [ ] Confirm `512`, `1024`, and `2048` render resolutions return non-zero consistent results.
-- [ ] Confirm cancellation works.
-- [ ] Confirm Surface mode accepts normals and rejects missing normals.
-- [ ] Compute SHA-256 for every published asset.
-- [ ] Include `LICENSE` and a link to corresponding source.
-
-## Publication
-
-- [ ] Tag source as `v1.0.0`.
-- [ ] Create a GitHub Release from the tag.
-- [ ] Attach the user manual PDF.
-- [ ] Attach platform binaries only when they pass the binary acceptance list.
-- [ ] State exact supported CloudCompare version(s) in each binary asset description.
+- [ ] `SOLIS Exposure...` appears between Calculate and Cleanup.
+- [ ] Sky-only disables location/time/atmosphere controls.
+- [ ] Crown summary forces Radiative Exposure on.
+- [ ] Mesh-only selection reports surface-area weighting and disables voxel controls.
+- [ ] Point-cloud selection reports occupied-voxel weighting.
+- [ ] All exposure fields are finite and within `[0,1]`.
+- [ ] Last Run removes exposure fields and crown metadata only.
+- [ ] Existing Calculate GUI still reproduces the frozen v1.0 regression values.

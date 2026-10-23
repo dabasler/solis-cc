@@ -1,4 +1,4 @@
-# Building qSOLIS v1.0.0
+# Building qSOLIS v1.1.0
 
 qSOLIS is built as an in-tree CloudCompare Standard plugin. The release includes
 a helper that copies or symlinks the plugin into a CloudCompare source checkout.

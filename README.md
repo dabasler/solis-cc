@@ -1,10 +1,9 @@
-# qSOLIS v1.0.0
+# qSOLIS v1.1.0
 
 qSOLIS is a CloudCompare plugin for solar visibility, irradiance, and irradiation
 analysis on point clouds and triangular meshes.
 
-Version 1.0.0 is the Qt 6 / current-CloudCompare port of the original SOLIS
-plugin. It includes GUI and command-line workflows, direct and diffuse solar
+Version 1.1.0 builds on the Qt 6 / current-CloudCompare port and adds quantitative canopy-exposure metrics. It includes GUI and command-line workflows, direct and diffuse solar
 components, horizontal-reference and normal-aware surface irradiance, batch time
 series, persistent result layers, and safe result cleanup.
 
@@ -16,6 +15,21 @@ series, persistent result layers, and safe result cleanup.
 - Platforms: source is designed for Linux, Windows, and macOS; v1.0.0 was
   acceptance-tested on a Qt 6 Linux build.
 - CloudCompare 2.13.x / Qt 5 is intentionally not targeted by this release.
+
+## Canopy Exposure (v1.1.0)
+
+The **SOLIS Exposure...** action and `-SOLIS_EXPOSURE` CLI command add three per-point/vertex fractions plus an entity-level crown summary:
+
+- Sky Exposure Factor: geometric upper-hemisphere openness.
+- Sun Exposure Fraction: fraction of sampled daylight time with sun access.
+- Radiative Exposure Index: received clear-sky direct+diffuse radiation divided by unobstructed horizontal potential.
+- Crown Exposure Index: density-robust crown-wide mean REI using occupied-voxel weighting for point clouds or surface-area weighting for meshes.
+
+Exposure separates **targets** from **occluding context**. Results are always written only to selected target entities, while the visibility renderer can use: target-only geometry, all selected targets (mutual occlusion), or every visible point cloud/mesh in the DB tree. This lets one selected tree be evaluated against neighboring visible trees/terrain without merging the scene.
+
+After calculating Crown Exposure, select one or more tree entities and use **SOLIS Export Crown Exposure Summary...** to write a CSV with the latest CEI summary for each selected tree. The CLI equivalent is `-SOLIS_EXPORT_CROWN <file.csv> [LATEST|ALL_RUNS]`.
+
+See `docs/CANOPY_EXPOSURE.md`.
 
 ## Main features
 
@@ -85,6 +99,15 @@ already has normals.
 
 The lower-right corner of the dialog displays the plugin version.
 
+Canopy-exposure calculations and tree-level export are available from the same plugin:
+
+```text
+Plugins > SOLIS Exposure...
+Plugins > SOLIS Export Crown Exposure Summary...
+```
+
+The export action writes the latest stored Crown Exposure summary for each selected tree/entity as one CSV row.
+
 Cleanup is part of the same plugin:
 
 ```text
@@ -150,7 +173,7 @@ rejection, and a synthetic wall-shadow/FBO case. See `docs/TESTING.md`.
 
 ## Documentation
 
-- `docs/qSOLIS_User_Manual_v1.0.0.pdf` - user manual
+- `docs/USER_MANUAL.md` - user manual
 - `docs/CLI.md` - command-line reference
 - `docs/CLI_LAYER_NAMING.md` - exact result layer naming grammar
 - `docs/TESTING.md` - regression and acceptance testing
@@ -160,7 +183,7 @@ rejection, and a synthetic wall-shadow/FBO case. See `docs/TESTING.md`.
 
 ## Scientific scope and limitations
 
-qSOLIS v1.0.0 is a clear-sky geometric/irradiance model. It does not ingest
+qSOLIS v1.1.0 is a clear-sky geometric/irradiance model. It does not ingest
 measured cloud cover or weather time series. The diffuse model is isotropic.
 Surface irradiance depends on the quality and orientation of input normals.
 Results are also resolution-dependent near shadow boundaries because visibility
