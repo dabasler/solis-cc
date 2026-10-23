@@ -91,9 +91,9 @@ echo '== Exposure 8/9 Target-only context ignores neighboring loaded wall =='
   -O "$HERE/context_target_ground.ply" \
   -O "$HERE/context_neighbor_wall.ply" \
   -SOLIS_EXPOSURE -METRICS SUN -CONTEXT TARGET -DOY 172 -TIME 12:00 -DURATION 0 \
-  -LAT 45 -LON 0 -ELV 0 -RESOLUTION 1024 \
+  -LAT 45 -LON 0 -ELV 0 -RESOLUTION 128 \
   -C_EXPORT_FMT ASC -PREC 12 -SEP SPACE \
-  -SAVE_CLOUDS FILE "$OUT/context_target_only.asc" "$OUT/context_target_only_wall.asc" >"$OUT/context_target_only.log" 2>&1
+  -SAVE_CLOUDS FILE "$OUT/context_target_only.asc $OUT/context_target_only_wall.asc" >"$OUT/context_target_only.log" 2>&1
 "$HERE/verify_exposure.py" context-target "$OUT/context_target_only.asc"
 
 echo
@@ -102,9 +102,9 @@ echo '== Exposure 9/9 Loaded context lets neighboring wall occlude target =='
   -O "$HERE/context_target_ground.ply" \
   -O "$HERE/context_neighbor_wall.ply" \
   -SOLIS_EXPOSURE -METRICS SUN -CONTEXT LOADED -DOY 172 -TIME 12:00 -DURATION 0 \
-  -LAT 45 -LON 0 -ELV 0 -RESOLUTION 1024 \
+  -LAT 45 -LON 0 -ELV 0 -RESOLUTION 128 \
   -C_EXPORT_FMT ASC -PREC 12 -SEP SPACE \
-  -SAVE_CLOUDS FILE "$OUT/context_loaded.asc" "$OUT/context_loaded_wall.asc" >"$OUT/context_loaded.log" 2>&1
+  -SAVE_CLOUDS FILE "$OUT/context_loaded.asc $OUT/context_loaded_wall.asc" >"$OUT/context_loaded.log" 2>&1
 grep -F "context=selected-entities" "$OUT/context_loaded.log" >/dev/null
 "$HERE/verify_exposure.py" context-loaded "$OUT/context_loaded.asc"
 

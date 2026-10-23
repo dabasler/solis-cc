@@ -1,0 +1,50 @@
+[22:55:49] [ccColorScalesManager] Found 0 custom scale(s) in persistent settings
+[22:55:49] [Plugin] Searching: /home/db/dev/CloudCompare-install-dev/lib/cloudcompare/plugins
+[22:55:49] 	Plugin found: Example (Standard Plugin) (libExamplePlugin.so)
+[22:55:49] 	Plugin found: Core I/O (libQCORE_IO_PLUGIN.so)
+[22:55:49] 	Plugin found: SOLIS (libQSOLIS_PLUGIN.so)
+[22:55:49] [Plugin] Searching: /home/db/.local/share/CCCorp/CloudCompare/plugins
+[22:55:49] [Plugin] Searching: /usr/share/ubuntu/CCCorp/CloudCompare/plugins
+[22:55:49] [Plugin] Searching: /usr/share/gnome/CCCorp/CloudCompare/plugins
+[22:55:49] [Plugin] Searching: /usr/local/share/CCCorp/CloudCompare/plugins
+[22:55:49] [Plugin] Searching: /usr/share/CCCorp/CloudCompare/plugins
+[22:55:49] [Plugin] Searching: /var/lib/snapd/desktop/CCCorp/CloudCompare/plugins
+[22:55:49] [Plugin][Core I/O] New file extensions registered:  BIM GEOREF MA OBJ OFF PDMS PTX SBF STL VTK
+[22:55:49] [Global Shift] Max abs. coord = 1e+04 / max abs. diag = 1e+06
+[22:55:49] [AUTO SAVE STATE] Command detected
+[22:55:49] Auto-save is disabled
+[22:55:49] [AUTO SAVE STATE] finished in 0.00 s.
+[22:55:49] [NO TIMESTAMP] Command detected
+[22:55:49] [NO TIMESTAMP] finished in 0.00 s.
+[22:55:49] [LOAD] Command detected
+[22:55:49] Opening file: '/home/db/dev/qSOLIS-github/qSolis/tests/regression/context_target_ground.ply'
+[22:55:49] [PLY][Comment] qSOLIS context regression target points
+[22:55:49] [PLY][Comment] axes: X=east, Y=north, Z=up
+[22:55:49] [I/O] File '/home/db/dev/qSOLIS-github/qSolis/tests/regression/context_target_ground.ply' loaded successfully
+[22:55:49] Found one cloud with 1189 points
+[22:55:49] [LOAD] finished in 0.00 s.
+[22:55:49] [LOAD] Command detected
+[22:55:49] Opening file: '/home/db/dev/qSOLIS-github/qSolis/tests/regression/context_neighbor_wall.ply'
+[22:55:49] [PLY][Comment] qSOLIS context regression neighboring occluder wall
+[22:55:49] [PLY][Comment] axes: X=east, Y=north, Z=up
+[22:55:49] [I/O] File '/home/db/dev/qSOLIS-github/qSolis/tests/regression/context_neighbor_wall.ply' loaded successfully
+[22:55:49] Found one cloud with 31375 points
+[22:55:49] [LOAD] finished in 0.00 s.
+[22:55:49] [SOLIS CANOPY EXPOSURE] Command detected
+[22:55:49] [SOLIS Exposure v1.1.0]
+[22:55:49] SOLIS Exposure settings: metrics=2, context=LOADED, DOY=172.5, duration=0 h, dt=10 min, rays=256, resolution=128
+[22:55:49] SOLIS Exposure 'context_target_ground - Cloud': context=selected-entities, occluding entities=2
+[22:55:49] SOLIS Exposure: created scalar field 'SOLIS Sun Exposure [fraction] D172 T1200 UTC R128'
+[22:55:49] SOLIS Exposure 'context_neighbor_wall - Cloud': context=selected-entities, occluding entities=2
+[22:55:49] SOLIS Exposure: created scalar field 'SOLIS Sun Exposure [fraction] D172 T1200 UTC R128'
+[22:55:49] [SOLIS CANOPY EXPOSURE] finished in 0.02 s.
+[22:55:49] [CHANGE CLOUD OUTPUT FORMAT] Command detected
+[22:55:49] Output export format (clouds) set to: ASC
+[22:55:49] [CHANGE CLOUD OUTPUT FORMAT] finished in 0.00 s.
+[22:55:49] [SAVE CLOUDS] Command detected
+[22:55:49] [SAVING]
+[22:55:49] [I/O] File '/home/db/dev/qSOLIS-github/qSolis/tests/regression/out-exposure//context_loaded.asc' saved successfully
+[22:55:49] [SAVING]
+[22:55:49] [I/O] File '/home/db/dev/qSOLIS-github/qSolis/tests/regression/out-exposure//context_loaded_wall.asc' saved successfully
+[22:55:49] [SAVE CLOUDS] finished in 0.03 s.
+[22:55:49] Processed finished in 0.05 s.

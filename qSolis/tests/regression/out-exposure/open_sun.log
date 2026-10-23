@@ -1,0 +1,39 @@
+[22:55:45] [ccColorScalesManager] Found 0 custom scale(s) in persistent settings
+[22:55:45] [Plugin] Searching: /home/db/dev/CloudCompare-install-dev/lib/cloudcompare/plugins
+[22:55:45] 	Plugin found: Example (Standard Plugin) (libExamplePlugin.so)
+[22:55:45] 	Plugin found: Core I/O (libQCORE_IO_PLUGIN.so)
+[22:55:45] 	Plugin found: SOLIS (libQSOLIS_PLUGIN.so)
+[22:55:45] [Plugin] Searching: /home/db/.local/share/CCCorp/CloudCompare/plugins
+[22:55:45] [Plugin] Searching: /usr/share/ubuntu/CCCorp/CloudCompare/plugins
+[22:55:45] [Plugin] Searching: /usr/share/gnome/CCCorp/CloudCompare/plugins
+[22:55:45] [Plugin] Searching: /usr/local/share/CCCorp/CloudCompare/plugins
+[22:55:45] [Plugin] Searching: /usr/share/CCCorp/CloudCompare/plugins
+[22:55:45] [Plugin] Searching: /var/lib/snapd/desktop/CCCorp/CloudCompare/plugins
+[22:55:45] [Plugin][Core I/O] New file extensions registered:  BIM GEOREF MA OBJ OFF PDMS PTX SBF STL VTK
+[22:55:45] [Global Shift] Max abs. coord = 1e+04 / max abs. diag = 1e+06
+[22:55:45] [AUTO SAVE STATE] Command detected
+[22:55:45] Auto-save is disabled
+[22:55:45] [AUTO SAVE STATE] finished in 0.00 s.
+[22:55:45] [NO TIMESTAMP] Command detected
+[22:55:45] [NO TIMESTAMP] finished in 0.00 s.
+[22:55:45] [LOAD] Command detected
+[22:55:45] Opening file: '/home/db/dev/qSOLIS-github/qSolis/tests/regression/exposure_open_point.ply'
+[22:55:45] [PLY][Comment] qSOLIS exposure regression open reference
+[22:55:45] [PLY][Comment] axes: X=east, Y=north, Z=up
+[22:55:45] [I/O] File '/home/db/dev/qSOLIS-github/qSolis/tests/regression/exposure_open_point.ply' loaded successfully
+[22:55:45] Found one cloud with 1 points
+[22:55:45] [LOAD] finished in 0.00 s.
+[22:55:45] [SOLIS CANOPY EXPOSURE] Command detected
+[22:55:45] [SOLIS Exposure v1.1.0]
+[22:55:45] SOLIS Exposure settings: metrics=2, context=LOADED, DOY=172.5, duration=0 h, dt=10 min, rays=256, resolution=1024
+[22:55:45] SOLIS Exposure 'exposure_open_point - Cloud': context=selected-entities, occluding entities=1
+[22:55:45] SOLIS Exposure: created scalar field 'SOLIS Sun Exposure [fraction] D172 T1200 UTC R1024'
+[22:55:45] [SOLIS CANOPY EXPOSURE] finished in 0.01 s.
+[22:55:45] [CHANGE CLOUD OUTPUT FORMAT] Command detected
+[22:55:45] Output export format (clouds) set to: ASC
+[22:55:45] [CHANGE CLOUD OUTPUT FORMAT] finished in 0.00 s.
+[22:55:45] [SAVE CLOUDS] Command detected
+[22:55:45] [SAVING]
+[22:55:45] [I/O] File '/home/db/dev/qSOLIS-github/qSolis/tests/regression/out-exposure//open_sun.asc' saved successfully
+[22:55:45] [SAVE CLOUDS] finished in 0.01 s.
+[22:55:45] Processed finished in 0.02 s.
