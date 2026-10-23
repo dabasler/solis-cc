@@ -112,20 +112,23 @@ jobs:
           git -C cc checkout --detach FETCH_HEAD
           
           for attempt in 1 2 3 4; do
-	    if git -C cc submodule update --init --recursive; then
-	      break
-	    fi
+            echo "Updating CloudCompare submodules (attempt $attempt/4)..."
 
-	    if [[ "$attempt" -eq 4 ]]; then
-	      echo "CloudCompare submodule checkout failed after 4 attempts" >&2
-	      exit 1
-	    fi
+            if git -C cc submodule update --init --recursive; then
+              echo "CloudCompare submodules updated successfully."
+              break
+            fi
 
-	    echo "Submodule checkout failed; retrying ($attempt/4)..."
-	    git -C cc submodule sync --recursive
-	    sleep $((attempt * 15))
-	  done
-	  
+            if [[ "$attempt" -eq 4 ]]; then
+              echo "CloudCompare submodule checkout failed after 4 attempts" >&2
+              exit 1
+            fi
+
+            echo "Submodule checkout failed; syncing URLs before retry..."
+            git -C cc submodule sync --recursive
+            sleep $((attempt * 15))
+          done
+
           echo "CLOUDCOMPARE_COMMIT=$(git -C cc rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Integrate qSOLIS source
