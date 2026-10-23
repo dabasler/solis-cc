@@ -110,7 +110,22 @@ jobs:
           git -C cc remote add origin "$CLOUDCOMPARE_REPOSITORY"
           git -C cc fetch --depth 1 origin "$CLOUDCOMPARE_REF"
           git -C cc checkout --detach FETCH_HEAD
-          git -C cc submodule update --init --recursive
+          
+          for attempt in 1 2 3 4; do
+	    if git -C cc submodule update --init --recursive; then
+	      break
+	    fi
+
+	    if [[ "$attempt" -eq 4 ]]; then
+	      echo "CloudCompare submodule checkout failed after 4 attempts" >&2
+	      exit 1
+	    fi
+
+	    echo "Submodule checkout failed; retrying ($attempt/4)..."
+	    git -C cc submodule sync --recursive
+	    sleep $((attempt * 15))
+	  done
+	  
           echo "CLOUDCOMPARE_COMMIT=$(git -C cc rev-parse HEAD)" >> "$GITHUB_ENV"
 
       - name: Integrate qSOLIS source
