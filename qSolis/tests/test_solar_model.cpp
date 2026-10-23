@@ -42,9 +42,14 @@ int main()
     Site localSite = site;
     localSite.timeMode = TimeMode::LocalFixedOffset;
     localSite.utcOffsetHours = 2.0;
-    const SolarPosition localEquivalent = SolarModel::position(172.0 + 14.0 / 24.0, localSite);
+    const double localEquivalentDoy = 172.0 + 14.0 / 24.0;
+    const SolarPosition localEquivalent = SolarModel::position(localEquivalentDoy, localSite);
+    const ClearSkyIrradiance localEquivalentSky = SolarModel::clearSky(localEquivalentDoy, localSite, localEquivalent);
     ok &= near(localEquivalent.altitudeDeg, summer.altitudeDeg, 1.0e-8, "UTC/local altitude equivalence");
     ok &= near(localEquivalent.azimuthDegFromNorth, summer.azimuthDegFromNorth, 1.0e-8, "UTC/local azimuth equivalence");
+    ok &= near(localEquivalentSky.dniWm2, summerSky.dniWm2, 1.0e-8, "UTC/local DNI equivalence");
+    ok &= near(localEquivalentSky.dhiWm2, summerSky.dhiWm2, 1.0e-8, "UTC/local DHI equivalence");
+    ok &= near(localEquivalentSky.ghiWm2, summerSky.ghiWm2, 1.0e-8, "UTC/local GHI equivalence");
 
     const SolarPosition night = SolarModel::position(172.0, site);
     const ClearSkyIrradiance nightSky = SolarModel::clearSky(172.0, site, night);

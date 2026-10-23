@@ -4,6 +4,12 @@ All notable changes to qSOLIS are documented here.
 
 ## [1.1.0] - 2026-10-23
 
+### CI / portability fixes
+
+- Correct UTC/local fixed-offset solar equivalence: declination, equation of time, and extraterrestrial irradiance are now evaluated at the same physical UTC instant while preserving the user-facing local clock. UTC-mode numerical behavior is unchanged.
+- Split Crown Exposure CSV metadata parsing/serialization from the CloudCompare DB wrapper so the headless unit test is QtCore-only and portable on Windows CI.
+
+
 ### Added
 
 - `SOLIS Exposure...` GUI action and `-SOLIS_EXPOSURE` CLI command.

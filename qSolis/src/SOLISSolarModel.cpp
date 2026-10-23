@@ -32,14 +32,23 @@ SolarPosition SolarModel::position(double dayOfYear, const Site& site)
 {
     SolarPosition result;
 
-    const double integerDay = std::floor(dayOfYear);
-    const double fractionalDay = dayOfYear - integerDay;
-    const double clockMinutes = fractionalDay * 1440.0;
-    const double clockHours = clockMinutes / 60.0;
+    const double localIntegerDay = std::floor(dayOfYear);
+    const double localFractionalDay = dayOfYear - localIntegerDay;
+    const double clockMinutes = localFractionalDay * 1440.0;
+
+    // The fractional-year terms (declination and equation of time) describe the physical
+    // instant, so they must be evaluated in UTC. The civil clock below remains local when
+    // LocalFixedOffset is selected. Keeping these two notions separate makes, for example,
+    // 12:00 UTC and 14:00 UTC+2 exactly equivalent without changing UTC-mode results.
+    const double utcOffsetHours = (site.timeMode == TimeMode::UTC ? 0.0 : site.utcOffsetHours);
+    const double utcDayOfYear = dayOfYear - utcOffsetHours / 24.0;
+    const double utcIntegerDay = std::floor(utcDayOfYear);
+    const double utcFractionalDay = utcDayOfYear - utcIntegerDay;
+    const double utcClockHours = utcFractionalDay * 24.0;
 
     // NOAA fractional-year approximation. A 365-day year is deliberately used because the
     // public SOLIS interface is day-of-year based and does not carry a calendar year.
-    const double gamma = 2.0 * Pi / 365.0 * (integerDay - 1.0 + (clockHours - 12.0) / 24.0);
+    const double gamma = 2.0 * Pi / 365.0 * (utcIntegerDay - 1.0 + (utcClockHours - 12.0) / 24.0);
     const double eqTime = 229.18 * (0.000075
                                    + 0.001868 * std::cos(gamma)
                                    - 0.032077 * std::sin(gamma)
@@ -54,7 +63,6 @@ SolarPosition SolarModel::position(double dayOfYear, const Site& site)
                       - 0.002697 * std::cos(3.0 * gamma)
                       + 0.001480 * std::sin(3.0 * gamma);
 
-    const double utcOffsetHours = (site.timeMode == TimeMode::UTC ? 0.0 : site.utcOffsetHours);
     const double trueSolarMinutes = wrapMinutes(clockMinutes + eqTime + 4.0 * site.longitudeDeg - 60.0 * utcOffsetHours);
     double hourAngleDeg = trueSolarMinutes / 4.0 - 180.0;
     if (hourAngleDeg < -180.0)
@@ -119,7 +127,11 @@ ClearSkyIrradiance SolarModel::clearSky(double dayOfYear, const Site& site, cons
     const double fh2 = std::exp(-site.elevationM / 1250.0);
     const double cg1 = 5.09e-5 * site.elevationM + 0.868;
     const double cg2 = 3.92e-5 * site.elevationM + 0.0387;
-    const double dniExtra = extraterrestrialNormalIrradiance(dayOfYear);
+    // Extraterrestrial irradiance also depends on the physical instant rather than the
+    // displayed local clock. This keeps clear-sky results invariant under UTC/local
+    // representations of the same instant.
+    const double utcOffsetHours = (site.timeMode == TimeMode::UTC ? 0.0 : site.utcOffsetHours);
+    const double dniExtra = extraterrestrialNormalIrradiance(dayOfYear - utcOffsetHours / 24.0);
 
     // Ineichen/Perez clear-sky GHI and DNI approximation.
     result.ghiWm2 = std::max(0.0,

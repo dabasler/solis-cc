@@ -12,6 +12,7 @@ target_sources( ${PROJECT_NAME}
         ${CMAKE_CURRENT_LIST_DIR}/SOLISExposure.cpp
         ${CMAKE_CURRENT_LIST_DIR}/SOLISCrownExposure.cpp
         ${CMAKE_CURRENT_LIST_DIR}/SOLISCrownExport.cpp
+        ${CMAKE_CURRENT_LIST_DIR}/SOLISCrownExportCloud.cpp
         ${CMAKE_CURRENT_LIST_DIR}/SOLISCrownExportCommand.cpp
         ${CMAKE_CURRENT_LIST_DIR}/SOLISExposureCommand.cpp
         ${CMAKE_CURRENT_LIST_DIR}/ccSolisExposureDlg.cpp

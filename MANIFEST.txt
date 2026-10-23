@@ -3,6 +3,7 @@
 BUILDING.md
 CHANGELOG.md
 CITATION.cff
+CI_FIX2_NOTES.md
 FIX1_NOTES.md
 IMPLEMENTATION_NOTES_v1.1.0.md
 KNOWN_LIMITATIONS.md
@@ -58,6 +59,7 @@ qSolis/src/SOLISCleanupDlg.cpp
 qSolis/src/SOLISCommand.cpp
 qSolis/src/SOLISContext.cpp
 qSolis/src/SOLISCrownExport.cpp
+qSolis/src/SOLISCrownExportCloud.cpp
 qSolis/src/SOLISCrownExportCommand.cpp
 qSolis/src/SOLISCrownExposure.cpp
 qSolis/src/SOLISExposure.cpp

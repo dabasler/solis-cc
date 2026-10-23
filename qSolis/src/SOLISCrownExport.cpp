@@ -1,7 +1,5 @@
 #include "SOLISCrownExport.h"
 
-#include <ccPointCloud.h>
-
 #include <QDateTime>
 #include <QFile>
 #include <QJsonArray>
@@ -97,7 +95,8 @@ bool isNewer(const CrownExposureExportRecord& lhs, const CrownExposureExportReco
     return lhs.runId > rhs.runId;
 }
 
-CrownExposureExportRecord parseRecord(const ccPointCloud* cloud,
+CrownExposureExportRecord parseRecord(const QString& cloudName,
+                                      unsigned cloudUniqueId,
                                       const QString& key,
                                       const QVariant& value)
 {
@@ -118,13 +117,10 @@ CrownExposureExportRecord parseRecord(const ccPointCloud* cloud,
     record.entityName = object.value(QStringLiteral("entityName")).toString();
     record.createdUtc = object.value(QStringLiteral("createdUtc")).toString();
 
-    if (cloud)
-    {
-        record.cloudName = cloud->getName();
-        record.cloudUniqueId = cloud->getUniqueID();
-        if (record.entityName.isEmpty())
-            record.entityName = record.cloudName;
-    }
+    record.cloudName = cloudName;
+    record.cloudUniqueId = cloudUniqueId;
+    if (record.entityName.isEmpty())
+        record.entityName = record.cloudName;
 
     record.cei = jsonNumber(object, QStringLiteral("cei"));
     record.skyMean = jsonNumber(object, QStringLiteral("skyMean"));
@@ -221,19 +217,17 @@ QStringList csvFields(const CrownExposureExportRecord& record)
 }
 } // namespace
 
-std::vector<CrownExposureExportRecord> CrownExposureExport::Records(const ccPointCloud* cloud)
+std::vector<CrownExposureExportRecord> CrownExposureExport::RecordsFromMetadata(const QVariantMap& metadata,
+                                                                                 const QString& cloudName,
+                                                                                 unsigned cloudUniqueId)
 {
     std::vector<CrownExposureExportRecord> records;
-    if (!cloud)
-        return records;
-
-    const QVariantMap& metadata = cloud->metaData();
     for (auto it = metadata.constBegin(); it != metadata.constEnd(); ++it)
     {
         if (!it.key().startsWith(QStringLiteral("qSOLIS/crownExposure/")))
             continue;
 
-        CrownExposureExportRecord record = parseRecord(cloud, it.key(), it.value());
+        CrownExposureExportRecord record = parseRecord(cloudName, cloudUniqueId, it.key(), it.value());
         if (record.runId.isEmpty() || !std::isfinite(record.cei))
             continue;
         records.push_back(std::move(record));
@@ -246,9 +240,12 @@ std::vector<CrownExposureExportRecord> CrownExposureExport::Records(const ccPoin
     return records;
 }
 
-bool CrownExposureExport::LatestRecord(const ccPointCloud* cloud, CrownExposureExportRecord& record)
+bool CrownExposureExport::LatestRecordFromMetadata(const QVariantMap& metadata,
+                                                   CrownExposureExportRecord& record,
+                                                   const QString& cloudName,
+                                                   unsigned cloudUniqueId)
 {
-    const std::vector<CrownExposureExportRecord> records = Records(cloud);
+    const std::vector<CrownExposureExportRecord> records = RecordsFromMetadata(metadata, cloudName, cloudUniqueId);
     if (records.empty())
         return false;
     record = records.front();

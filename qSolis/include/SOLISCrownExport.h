@@ -3,6 +3,7 @@
 #include <QByteArray>
 #include <QString>
 #include <QStringList>
+#include <QVariant>
 
 #include <limits>
 #include <vector>
@@ -65,6 +66,18 @@ struct CrownExposureExportRecord
 class CrownExposureExport
 {
 public:
+    //! Parses Crown Exposure records from an arbitrary metadata map. This QtCore-only path
+    //! is also used by unit tests so they do not need to instantiate CloudCompare DB objects.
+    static std::vector<CrownExposureExportRecord> RecordsFromMetadata(const QVariantMap& metadata,
+                                                                       const QString& cloudName = QString(),
+                                                                       unsigned cloudUniqueId = 0);
+
+    //! Returns the most recent record from an arbitrary metadata map.
+    static bool LatestRecordFromMetadata(const QVariantMap& metadata,
+                                         CrownExposureExportRecord& record,
+                                         const QString& cloudName = QString(),
+                                         unsigned cloudUniqueId = 0);
+
     //! Returns all valid qSOLIS/crownExposure/* records stored on a cloud.
     static std::vector<CrownExposureExportRecord> Records(const ccPointCloud* cloud);
 

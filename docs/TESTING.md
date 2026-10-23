@@ -93,3 +93,9 @@ This checks an unobstructed reference (SEF/SuEF/REI approximately 1, CEI approxi
 
 With `SOLIS_BUILD_TESTS=ON`, `qsolis_crown_export` verifies stable CSV serialization, quoting of tree names containing commas/quotes, exposed-percent output, occluder provenance, and byte-for-byte file writing. Manual GUI acceptance should also select several trees with stored CEI metadata and confirm **SOLIS Export Crown Exposure Summary...** produces one row per selected tree using the latest run.
 
+
+## Cross-platform unit-test portability
+
+The Crown Exposure CSV test intentionally exercises the QtCore-only metadata/serialization layer rather than constructing `ccPointCloud` objects. This keeps the unit test independent of CloudCompare DB runtime initialization and makes it suitable for Linux, macOS and Windows hosted CI. The plugin's CloudCompare wrapper is compiled as part of the normal plugin build.
+
+The solar-model unit test verifies that equivalent UTC and fixed-offset local times produce the same solar position and clear-sky irradiance.

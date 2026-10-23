@@ -1,9 +1,8 @@
 #include "SOLISCrownExport.h"
 
-#include <ccPointCloud.h>
-
 #include <QFile>
 #include <QTemporaryDir>
+#include <QVariant>
 
 #include <cmath>
 #include <iostream>
@@ -70,18 +69,24 @@ int main()
     ok &= require(line.contains(QStringLiteral("Tree_B [id=7]; Terrain [id=9]")),
                   "occluder list missing from CSV line");
 
-    ccPointCloud metadataCloud(QStringLiteral("Tree_Metadata"));
-    metadataCloud.setMetaData(
+    QVariantMap metadata;
+    metadata.insert(
         QStringLiteral("qSOLIS/crownExposure/run-old"),
         QStringLiteral("{\"schemaVersion\":3,\"pluginVersion\":\"1.1.0\",\"resultFamily\":\"crownExposure\",\"runId\":\"run-old\",\"entityName\":\"Tree_001\",\"createdUtc\":\"2026-10-22T12:00:00.000Z\",\"cei\":0.4,\"radiativeMean\":0.4}"));
-    metadataCloud.setMetaData(
+    metadata.insert(
         QStringLiteral("qSOLIS/crownExposure/run-new"),
         QStringLiteral("{\"schemaVersion\":3,\"pluginVersion\":\"1.1.0\",\"resultFamily\":\"crownExposure\",\"runId\":\"run-new\",\"entityName\":\"Tree_001\",\"createdUtc\":\"2026-10-23T12:00:00.000Z\",\"cei\":0.8,\"radiativeMean\":0.8,\"occlusionContext\":\"ALL_VISIBLE_ENTITIES\"}"));
 
-    const auto parsed = solis::CrownExposureExport::Records(&metadataCloud);
+    const auto parsed = solis::CrownExposureExport::RecordsFromMetadata(
+        metadata, QStringLiteral("Tree_Metadata"), 42);
     ok &= require(parsed.size() == 2, "crown metadata parser should return two records");
+    ok &= require(parsed.front().cloudName == QStringLiteral("Tree_Metadata"),
+                  "metadata parser should preserve supplied cloud name");
+    ok &= require(parsed.front().cloudUniqueId == 42,
+                  "metadata parser should preserve supplied cloud unique ID");
     solis::CrownExposureExportRecord latest;
-    ok &= require(solis::CrownExposureExport::LatestRecord(&metadataCloud, latest),
+    ok &= require(solis::CrownExposureExport::LatestRecordFromMetadata(
+                      metadata, latest, QStringLiteral("Tree_Metadata"), 42),
                   "latest crown metadata lookup failed");
     ok &= require(latest.runId == QStringLiteral("run-new"), "latest crown run selection failed");
     ok &= require(std::abs(latest.cei - 0.8) < 1.0e-12, "latest crown CEI parse failed");

@@ -9,3 +9,8 @@ const-safe `getPoint()` accessor instead of casting away constness.
 
 This changes no exposure formulas, result naming, metadata, renderer behavior,
 or v1.0 Direct/Diffuse/Total calculations.
+
+## CI portability fix
+
+- Fixed the UTC/local fixed-offset solar-model equivalence uncovered by multi-platform CI.
+- Refactored Crown Exposure export tests to avoid instantiating CloudCompare DB objects in the headless Windows test process.

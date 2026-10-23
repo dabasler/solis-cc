@@ -31,7 +31,8 @@ add_executable( qsolis_crown_export_tests
     ${CMAKE_CURRENT_LIST_DIR}/../src/SOLISCrownExport.cpp
 )
 target_include_directories( qsolis_crown_export_tests PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../include )
-target_link_libraries( qsolis_crown_export_tests PRIVATE QCC_DB_LIB Qt6::Core )
+target_link_libraries( qsolis_crown_export_tests PRIVATE Qt6::Core )
 target_compile_features( qsolis_crown_export_tests PRIVATE cxx_std_17 )
 set_target_properties( qsolis_crown_export_tests PROPERTIES AUTOMOC OFF AUTORCC OFF AUTOUIC OFF )
 add_test( NAME qsolis_crown_export COMMAND qsolis_crown_export_tests )
+set_tests_properties( qsolis_crown_export PROPERTIES TIMEOUT 30 )
