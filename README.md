@@ -1,201 +1,191 @@
 # qSOLIS v1.1.0
 
-qSOLIS is a CloudCompare plugin for solar visibility, irradiance, and irradiation
-analysis on point clouds and triangular meshes.
+qSOLIS is a CloudCompare plugin for solar irradiance, visibility, and canopy-exposure analysis.
 
-Version 1.1.0 builds on the Qt 6 / current-CloudCompare port and adds quantitative canopy-exposure metrics. It includes GUI and command-line workflows, direct and diffuse solar
-components, horizontal-reference and normal-aware surface irradiance, batch time
-series, persistent result layers, and safe result cleanup.
+## Release compatibility
 
-## Compatibility
+| Platform | Architecture | Release target |
+|---|---|---|
+| Windows | x86_64 / x64 | CloudCompare v2.14.beta2 |
+| macOS | Apple Silicon / arm64 | CloudCompare v2.14.beta2 |
+| Linux | x86_64 | Ubuntu 24.04, CloudCompare v2.14.beta2 |
 
-- CloudCompare: **2.14+ / current Qt 6 code line**
-- Qt: **Qt 6**
-- C++: follows CloudCompare (currently C++17)
-- Platforms: source is designed for Linux, Windows, and macOS; v1.0.0 was
-  acceptance-tested on a Qt 6 Linux build.
-- CloudCompare 2.13.x / Qt 5 is intentionally not targeted by this release.
+> **Important:** qSOLIS release binaries are built and tested with **CloudCompare v2.14.beta2**. Keep the release bundle together. Do not copy only the qSOLIS plugin binary into a different CloudCompare version unless you rebuild qSOLIS against that version.
 
-## Canopy Exposure (v1.1.0)
+## Installation from a release
 
-The **SOLIS Exposure...** action and `-SOLIS_EXPOSURE` CLI command add three per-point/vertex fractions plus an entity-level crown summary:
+The normal installation path is the **precompiled release package**. Building from source is only needed for development or unsupported platforms.
 
-- Sky Exposure Factor: geometric upper-hemisphere openness.
-- Sun Exposure Fraction: fraction of sampled daylight time with sun access.
-- Radiative Exposure Index: received clear-sky direct+diffuse radiation divided by unobstructed horizontal potential.
-- Crown Exposure Index: density-robust crown-wide mean REI using occupied-voxel weighting for point clouds or surface-area weighting for meshes.
+1. Open the qSOLIS **GitHub Releases** page.
+2. Download the archive for your operating system and architecture.
+3. Extract the complete archive.
+4. Keep the extracted directory structure intact.
+5. Start the CloudCompare executable contained in that release bundle.
+6. In CloudCompare, confirm that **SOLIS** is available in the plugin menu.
 
-Exposure separates **targets** from **occluding context**. Results are always written only to selected target entities, while the visibility renderer can use: target-only geometry, all selected targets (mutual occlusion), or every visible point cloud/mesh in the DB tree. This lets one selected tree be evaluated against neighboring visible trees/terrain without merging the scene.
+### Windows x64
 
-After calculating Crown Exposure, select one or more tree entities and use **SOLIS Export Crown Exposure Summary...** to write a CSV with the latest CEI summary for each selected tree. The CLI equivalent is `-SOLIS_EXPORT_CROWN <file.csv> [LATEST|ALL_RUNS]`.
+1. Download the **Windows x64** release ZIP.
+2. Extract it to a permanent folder, for example:
 
-See `docs/CANOPY_EXPOSURE.md`.
+   ```text
+   C:\Apps\qSOLIS-1.1.0\
+   ```
 
-## Main features
+3. Do **not** move only the qSOLIS DLL out of the extracted package.
+4. Launch the bundled `CloudCompare.exe`.
+5. Confirm that **SOLIS** appears in CloudCompare's plugin menu.
+6. Optionally create a desktop or Start-menu shortcut to that executable.
 
-- Direct, Diffuse, and Total solar results.
-- Instantaneous irradiance (`W/m2`), mean irradiance (`W/m2`), and integrated
-  irradiation (`Wh/m2` or `kWh/m2`).
-- Horizontal-reference, true surface (normal-aware), and visibility modes.
-- UTC or fixed-offset local time input.
-- Clear-sky irradiance using the current qSOLIS solar/atmospheric model and
-  configurable Linke turbidity.
-- Deterministic diffuse hemisphere sampling.
-- Persistent offscreen OpenGL framebuffer rendering with reusable VBO/EBO
-  geometry buffers.
-- Parallel CPU point projection/visibility evaluation.
-- Optional grouping of nearby direct-sun directions for long integrations.
-- Batch time-series generation with one scalar field per stored time point.
-- Metadata-backed result provenance and safe cleanup by run/batch.
-- GUI and CLI use the same numerical engine and result layer.
+If Windows displays a download/security warning, verify that you downloaded the archive from the official qSOLIS release and, if provided, verify its checksum before running it.
 
-## Quick source integration
+### macOS Apple Silicon
 
-From the extracted qSOLIS release directory:
+The v1.1.0 macOS build targets **Apple Silicon (arm64)**. It is not an Intel/x86_64 build.
 
-```bash
-python3 tools/install_into_cloudcompare.py ~/dev/CloudCompare --symlink
-```
+1. Download the **macOS arm64** release archive.
+2. Extract the complete archive.
+3. Move the extracted application/bundle to a permanent location if desired.
+4. Launch the bundled CloudCompare application.
+5. Confirm that **SOLIS** appears in CloudCompare's plugin menu.
 
-Then configure and build CloudCompare:
+The macOS release is currently **unsigned**. On first launch, macOS may block it. If that happens:
 
-```bash
-cd ~/dev/CloudCompare
-cmake -S . -B build-qsolis \
-  -G Ninja \
-  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DOPTION_BUILD_CCVIEWER=OFF \
-  -DPLUGIN_STANDARD_QSOLIS=ON
-cmake --build build-qsolis --parallel
-```
+1. In Finder, Control-click the CloudCompare application and choose **Open**.
+2. If it is still blocked, open **System Settings → Privacy & Security**.
+3. Use **Open Anyway** for the downloaded CloudCompare/qSOLIS application.
+4. Only bypass the warning after confirming that the archive came from the official qSOLIS release.
 
-For a clean install tree:
+### Linux x86_64
 
-```bash
-cmake -S . -B build-qsolis-release \
-  -G Ninja \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_INSTALL_PREFIX="$HOME/CloudCompare-qSOLIS" \
-  -DOPTION_BUILD_CCVIEWER=OFF \
-  -DPLUGIN_STANDARD_QSOLIS=ON
-cmake --build build-qsolis-release --parallel
-cmake --install build-qsolis-release
-```
+The Linux release is tested on **Ubuntu 24.04 x86_64**.
 
-See `BUILDING.md` for details.
+1. Download the Linux release archive.
+2. Extract it, for example:
 
-## GUI
+   ```bash
+   mkdir -p qSOLIS-1.1.0
+   unzip <linux-release>.zip -d qSOLIS-1.1.0
+   cd qSOLIS-1.1.0
+   ```
 
-Select one or more point clouds or meshes, then use:
+3. Start the bundled CloudCompare executable:
 
-```text
-Plugins > SOLIS Calculate...
-```
+   ```bash
+   ./bin/CloudCompare
+   ```
 
-The dialog exposes location/time, quantity, spatial mode, Direct/Diffuse
-components, batch time series, quality presets, and advanced atmosphere/render
-controls. Surface mode is available only when every selected point/vertex cloud
-already has normals.
+4. Confirm that **SOLIS** appears in CloudCompare's plugin menu.
 
-The lower-right corner of the dialog displays the plugin version.
+Other Linux distributions may work, but Ubuntu 24.04 is the release target used for CI and regression testing.
 
-Canopy-exposure calculations and tree-level export are available from the same plugin:
+## Quick start
 
-```text
-Plugins > SOLIS Exposure...
-Plugins > SOLIS Export Crown Exposure Summary...
-```
+For a short walkthrough, see:
 
-The export action writes the latest stored Crown Exposure summary for each selected tree/entity as one CSV row.
+**[qSOLIS 5-minute tutorial](TUTORIAL.md)**
 
-Cleanup is part of the same plugin:
+The tutorial covers:
 
-```text
-Plugins > SOLIS Cleanup...
-```
+- loading a cloud or mesh;
+- selecting the analysis target;
+- Surface vs Horizontal analysis;
+- time/location settings;
+- occlusion context;
+- canopy-exposure metrics;
+- interpreting SEF, SuEF, REI, and CEI results.
 
-Cleanup can remove the last run, last batch, a selected batch, all
-metadata-backed qSOLIS fields, or explicitly selected legacy SOLIS-named fields.
+## qSOLIS v1.1 canopy exposure
 
-## CLI quick example
+qSOLIS v1.1 adds exposure metrics intended for canopy, crown, and obstruction analysis:
 
-```bash
-CloudCompare \
-  -SILENT \
-  -AUTO_SAVE OFF \
-  -O tree.ply \
-  -SOLIS \
-  -COMPONENT ALL \
-  -OUTPUT_MODE ENERGY \
-  -ENERGY_UNIT WH \
-  -SPATIAL_MODE HORIZONTAL \
-  -DOY 172 -TIME 00:00 \
-  -DURATION 24 -TIMESTEP 5 \
-  -LAT 45 -LON 0 -ELV 0 \
-  -DIFFUSE_RAYS 256 \
-  -RESOLUTION 1024
-```
+- **SEF — Sky Exposure Factor:** weighted geometric visibility of the upper hemisphere, from 0 to 1.
+- **SuEF — Sun Exposure Fraction:** fraction of daylight time with line of sight to the sun, from 0 to 1.
+- **REI — Radiative Exposure Index:** received direct + diffuse radiation relative to an unobstructed horizontal reference, from 0 to 1.
+- **CEI — Crown Exposure Index:** entity-level spatially weighted summary of REI.
 
-Exact CLI options and examples are in `docs/CLI.md`.
+### Occlusion context
 
-## Result scalar fields
+The GUI provides three context modes:
 
-qSOLIS never silently overwrites a previous result. Each result is stored as a
-new CloudCompare scalar field on the original point/vertex cloud, for example:
+- **Target only** — only the target geometry can occlude itself.
+- **Selected entities** — selected neighboring entities also block rays. This is the recommended/default multi-entity workflow.
+- **All visible entities** — all visible geometry can participate as occlusion context.
+
+Only the target receives result scalar fields. Context entities act as blockers.
+
+## Surface-analysis notes
+
+qSOLIS uses the coordinate convention:
 
 ```text
-SOLIS Direct [W/m2] D175 T1200 UTC H R1024
-SOLIS Diffuse [W/m2] D175 T1200 UTC H R1024
-SOLIS Total [Wh/m2] D175 T0000 UTC dur24h dt5m H R1024
+X = east
+Y = north
+Z = up
 ```
 
-Repeated identical names receive `#2`, `#3`, etc. Full calculation provenance,
-including qSOLIS version, is stored in CloudCompare object metadata. For exact
-machine-parsing rules, see `docs/CLI_LAYER_NAMING.md`.
+**Surface** irradiance requires valid normals on the target.
 
-## Testing
+**Horizontal** irradiance and canopy-exposure metrics do not require target normals.
 
-A frozen v1.0.0 end-to-end regression suite is shipped under:
+## Command-line regression suites
 
-```text
-qSolis/tests/regression/
-```
+Run the installed release candidate rather than a build-tree CloudCompare executable.
 
-Run it against an installed CloudCompare build:
+### Frozen v1.0 solar regression
 
 ```bash
-cd qSolis/tests/regression
 ./run_qsolis_regression.sh /path/to/CloudCompare
 ```
 
-The accepted v1.0.0 baseline verifies surface-normal incidence, missing-normal
-rejection, and a synthetic wall-shadow/FBO case. See `docs/TESTING.md`.
+The suite verifies:
 
-## Documentation
+1. Direct instantaneous **surface irradiance** with known normals.
+2. Explicit rejection of Surface mode when normals are absent.
+3. Direct instantaneous **horizontal irradiance** behind a 5 m wall, including the offscreen OpenGL/FBO visibility path.
 
-- `docs/USER_MANUAL.md` - user manual
-- `docs/CLI.md` - command-line reference
-- `docs/CLI_LAYER_NAMING.md` - exact result layer naming grammar
-- `docs/TESTING.md` - regression and acceptance testing
-- `docs/CLEANUP.md` - result cleanup behavior
-- `docs/PORTING_NOTES.md` - implementation/port notes
-- `docs/DISTRIBUTION.md` - guidance for binary releases
+The frozen expected values are in `expected_results.json`. If the scientific model is deliberately changed in a future release, update the baseline as an explicit model change; do not simply loosen tolerances.
 
-## Scientific scope and limitations
+The original v1.0.0 acceptance run produced:
 
-qSOLIS v1.1.0 is a clear-sky geometric/irradiance model. It does not ingest
-measured cloud cover or weather time series. The diffuse model is isotropic.
-Surface irradiance depends on the quality and orientation of input normals.
-Results are also resolution-dependent near shadow boundaries because visibility
-is evaluated through a finite-resolution depth map.
+```text
+surface HORIZONTAL  : median=262.5244 W/m2  PASS
+surface SOUTH       : median=665.6770 W/m2  PASS
+surface NORTH       : median=0.0000 W/m2    PASS
+surface TILT45_SOUTH: median=656.6156 W/m2  PASS
+wall sunlit median  : 834.6073 W/m2         PASS
+wall shadow median  : approximately 0 W/m2 PASS
+expected shadow length: 1.9746 m
+```
 
-The renderer requires a usable Qt/OpenGL platform even in CLI mode.
+### v1.1 canopy-exposure regression
 
-## License
+```bash
+./run_qsolis_exposure_regression.sh /path/to/CloudCompare
+```
 
-qSOLIS is distributed under the GNU General Public License, version 2 or later.
-See `LICENSE`.
+This suite covers:
 
-## Automated release builds
+- open-reference Sky Exposure;
+- open-reference Sun Exposure;
+- open-reference Radiative Exposure and Crown Exposure;
+- rejection of Sun Exposure intervals containing no daylight;
+- wall direct-sun accessibility;
+- wall sky openness;
+- wall REI behavior;
+- separate target/neighbor geometry with **Target only** context;
+- separate target/neighbor geometry with **Loaded/selected** context.
 
-GitHub Actions can build and package qSOLIS for Linux, Windows, and macOS when a `v*.*.*` tag is pushed. See [`docs/GITHUB_ACTIONS_RELEASES.md`](docs/GITHUB_ACTIONS_RELEASES.md).
+For the multi-entity exposure tests, `context_target_ground.ply` and `context_neighbor_wall.ply` are loaded as separate entities. The regression verifies that target-only context leaves the ground target exposed while loaded context allows the separately loaded wall to occlude it.
+
+## Building from source
+
+Source builds are intended for developers, unsupported platforms, or users who need to build qSOLIS against a different CloudCompare revision.
+
+When building from source, use the CloudCompare revision that matches your intended deployment and enable qSOLIS with:
+
+```text
+-DPLUGIN_STANDARD_QSOLIS=ON
+```
+
+For normal users, the precompiled release package is recommended.
