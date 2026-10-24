@@ -14,70 +14,142 @@ qSOLIS is a CloudCompare plugin for solar irradiance, visibility, and canopy-exp
 
 ## Installation from a release
 
-The normal installation path is the **precompiled release package**. Building from source is only needed for development or unsupported platforms.
+qSOLIS release archives contain the **qSOLIS plugin binary only**. They do **not** contain a complete CloudCompare installation.
 
-1. Open the qSOLIS **GitHub Releases** page.
-2. Download the archive for your operating system and architecture.
-3. Extract the complete archive.
-4. Keep the extracted directory structure intact.
-5. Start the CloudCompare executable contained in that release bundle.
-6. In CloudCompare, confirm that **SOLIS** is available in the plugin menu.
+Install **CloudCompare v2.14.beta2** for your platform first, then copy the qSOLIS plugin into that CloudCompare installation.
+
+> **Important:** Use the package matching both your operating system and architecture. qSOLIS v1.1.0 release binaries are built and tested against **CloudCompare v2.14.beta2**.
 
 ### Windows x64
 
-1. Download the **Windows x64** release ZIP.
-2. Extract it to a permanent folder, for example:
+Download:
+
+```text
+qSOLIS-1.1.0-CloudCompare-v2.14.beta2-windows-x64-msvc.zip
+```
+
+The archive contains:
+
+```text
+CloudCompare/plugins/QSOLIS_PLUGIN.dll
+```
+
+Installation:
+
+1. Install or extract the **64-bit CloudCompare v2.14.beta2** Windows build.
+2. Close CloudCompare if it is running.
+3. Extract the qSOLIS ZIP.
+4. Copy:
 
    ```text
-   C:\Apps\qSOLIS-1.1.0\
+   CloudCompare\plugins\QSOLIS_PLUGIN.dll
    ```
 
-3. Do **not** move only the qSOLIS DLL out of the extracted package.
-4. Launch the bundled `CloudCompare.exe`.
-5. Confirm that **SOLIS** appears in CloudCompare's plugin menu.
-6. Optionally create a desktop or Start-menu shortcut to that executable.
+   from the qSOLIS archive into the `plugins` directory of your CloudCompare installation:
 
-If Windows displays a download/security warning, verify that you downloaded the archive from the official qSOLIS release and, if provided, verify its checksum before running it.
+   ```text
+   <CloudCompare installation>\plugins\QSOLIS_PLUGIN.dll
+   ```
 
-### macOS Apple Silicon
+5. Start CloudCompare.
+6. Confirm that **SOLIS** appears in the plugin menu.
 
-The v1.1.0 macOS build targets **Apple Silicon (arm64)**. It is not an Intel/x86_64 build.
+If Windows blocks the downloaded ZIP or DLL, verify that it came from the official qSOLIS GitHub Release and, if desired, verify the published SHA-256 checksum before unblocking it.
 
-1. Download the **macOS arm64** release archive.
-2. Extract the complete archive.
-3. Move the extracted application/bundle to a permanent location if desired.
-4. Launch the bundled CloudCompare application.
-5. Confirm that **SOLIS** appears in CloudCompare's plugin menu.
+### macOS Apple Silicon (arm64)
 
-The macOS release is currently **unsigned**. On first launch, macOS may block it. If that happens:
+Download:
 
-1. In Finder, Control-click the CloudCompare application and choose **Open**.
-2. If it is still blocked, open **System Settings → Privacy & Security**.
-3. Use **Open Anyway** for the downloaded CloudCompare/qSOLIS application.
-4. Only bypass the warning after confirming that the archive came from the official qSOLIS release.
+```text
+qSOLIS-1.1.0-CloudCompare-v2.14.beta2-macos-arm64-clang-unsigned.zip
+```
+
+The archive contains:
+
+```text
+CloudCompare/CloudCompare.app/Contents/PlugIns/ccPlugins/libQSOLIS_PLUGIN.dylib
+```
+
+Installation:
+
+1. Install **CloudCompare v2.14.beta2 for Apple Silicon (arm64)**.
+2. Quit CloudCompare.
+3. Extract the qSOLIS ZIP.
+4. In Finder, locate your installed `CloudCompare.app`.
+5. Control-click `CloudCompare.app` and choose **Show Package Contents**.
+6. Open:
+
+   ```text
+   Contents/PlugIns/ccPlugins/
+   ```
+
+7. Copy:
+
+   ```text
+   libQSOLIS_PLUGIN.dylib
+   ```
+
+   from the qSOLIS archive into that `ccPlugins` directory.
+8. Start CloudCompare.
+9. Confirm that **SOLIS** appears in the plugin menu.
+
+The qSOLIS macOS plugin is currently **unsigned**. macOS may display a security warning after the plugin is added. Only allow the application/plugin after verifying that the archive came from the official qSOLIS GitHub Release.
+
+The v1.1.0 macOS package is **arm64 only**; it is not an Intel/x86_64 build.
 
 ### Linux x86_64
 
-The Linux release is tested on **Ubuntu 24.04 x86_64**.
+Download:
 
-1. Download the Linux release archive.
-2. Extract it, for example:
+```text
+qSOLIS-1.1.0-CloudCompare-v2.14.beta2-linux-x86_64-ubuntu24.04-gcc.zip
+```
 
-   ```bash
-   mkdir -p qSOLIS-1.1.0
-   unzip <linux-release>.zip -d qSOLIS-1.1.0
-   cd qSOLIS-1.1.0
+The archive contains:
+
+```text
+lib/cloudcompare/plugins/libQSOLIS_PLUGIN.so
+```
+
+Installation:
+
+1. Install **CloudCompare v2.14.beta2**.
+2. Close CloudCompare if it is running.
+3. Extract the qSOLIS ZIP.
+4. Copy:
+
+   ```text
+   lib/cloudcompare/plugins/libQSOLIS_PLUGIN.so
    ```
 
-3. Start the bundled CloudCompare executable:
+   into the matching plugin directory of your CloudCompare installation:
 
-   ```bash
-   ./bin/CloudCompare
+   ```text
+   <CloudCompare installation prefix>/lib/cloudcompare/plugins/
    ```
 
-4. Confirm that **SOLIS** appears in CloudCompare's plugin menu.
+5. Start CloudCompare.
+6. Confirm that **SOLIS** appears in the plugin menu.
 
-Other Linux distributions may work, but Ubuntu 24.04 is the release target used for CI and regression testing.
+The Linux release is built and tested on **Ubuntu 24.04 x86_64**. Other Linux distributions may require building qSOLIS from source because of compiler, Qt, or system-library compatibility.
+
+### Verify the download
+
+Each release ZIP is accompanied by a `.sha256` file.
+
+On Linux or macOS:
+
+```bash
+sha256sum -c <package>.sha256
+```
+
+On Windows PowerShell, calculate the hash with:
+
+```powershell
+Get-FileHash <package>.zip -Algorithm SHA256
+```
+
+and compare it with the published `.sha256` value.
 
 ## Quick start
 
